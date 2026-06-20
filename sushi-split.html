@@ -464,7 +464,13 @@
   <a href="index.html" style="color: var(--muted); font-size: 11px; text-decoration: none; opacity: 0.45; letter-spacing: 0.5px;">0oo.fish.oo0</a>
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+/* ── multiplayer: connect to the shared room database (Supabase) ── */
+const SUPABASE_URL = 'https://zhxjaivcthosqzzfbvqh.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_j18fuWpO4nkHk3zckOJzWg_NgO0LbOb';
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 const LS_SETTINGS = 'kaiten_settings_v1';
 const LS_TALLY    = 'kaiten_tally_v1';
 const LS_LANG     = 'kaiten_lang_v1';
@@ -1171,6 +1177,17 @@ document.getElementById('langToggleBtn').onclick = () => setLanguage(currentLang
 updateStaticLabels();
 renderSettings();
 renderTally();
+
+/* ── multiplayer: one-time check that we can reach the server (temporary —
+   removed once real room-joining logic replaces it) ── */
+supabaseClient.rpc('ping').then(({ error }) => {
+  if (error) {
+    console.error('Supabase connection check failed:', error);
+    toast('⚠️ Server unreachable (offline mode still works)');
+  } else {
+    toast('✅ Connected to server');
+  }
+});
 </script>
 </body>
 </html>
