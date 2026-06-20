@@ -376,6 +376,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="tally"    id="lblTabTally">計帳點餐</button>
       <button class="tab"        data-tab="settings" id="lblTabSettings">單價設定</button>
+      <button class="tab"        data-tab="history"  id="lblTabHistory">歷史帳單</button>
     </div>
     <button id="langToggleBtn" class="lang-btn">EN</button>
   </div>
@@ -493,6 +494,14 @@
       <button class="btn ghost sm" id="resetPrices">重設回預設碟價</button>
     </div>
   </section>
+
+  <section id="history" class="panel">
+    <div class="card">
+      <h2><span class="ico">📜</span> <span id="lblHistoryTitle">過往帳單</span></h2>
+      <p class="muted" style="margin-top:-4px" id="lblHistoryMuted">關閉帳單時，可選擇將結算結果儲存喺呢部手機。呢度嘅紀錄只喺你嘅手機，唔會上載到伺服器。</p>
+      <div id="historyList"></div>
+    </div>
+  </section>
 </div>
 
 <div class="grand" id="grandBar">
@@ -578,7 +587,14 @@ const i18n = {
     connectionLost:'⚠️ Reconnecting — tallying paused',
     connectionRestored:'Back online — synced up',
     onlineTapPausedMsg:"Reconnecting — can't tally right now",
-    onlineSaveFailed:"That change wasn't saved — check your connection"
+    onlineSaveFailed:"That change wasn't saved — check your connection",
+    tabHistory:'Past Bills', historyTitle:'Past Bills',
+    historyMuted:'When you close a bill, you can save the final split to this phone. These records stay on your device only — nothing is uploaded.',
+    noHistoryMsg:'No saved bills yet.', exportJsonBtn:'Export',
+    confirmDeleteHistory:'Delete this saved bill?',
+    confirmFinishClose:"Finish and close this bill for everyone? This can't be undone.",
+    confirmSaveHistory:'Save a copy of the final split to this phone?',
+    billClosedMsg:'Bill closed.', finishCloseBtn:'Finish & Close'
   },
   zh: {
     title:'壽司分帳機', headerTitle:'🍣 數碟郎 — 迴轉壽司分帳機',
@@ -627,7 +643,14 @@ const i18n = {
     connectionLost:'⚠️ 重新連接中 — 已暫停計帳',
     connectionRestored:'已重新連線，資料已更新',
     onlineTapPausedMsg:'重新連接中，未能計帳',
-    onlineSaveFailed:'嗰個改動未儲到，請檢查網絡'
+    onlineSaveFailed:'嗰個改動未儲到，請檢查網絡',
+    tabHistory:'歷史帳單', historyTitle:'過往帳單',
+    historyMuted:'關閉帳單時，可選擇將結算結果儲存喺呢部手機。呢度嘅紀錄只喺你嘅手機，唔會上載到伺服器。',
+    noHistoryMsg:'暫時未有已儲存嘅帳單。', exportJsonBtn:'匯出',
+    confirmDeleteHistory:'確定要刪除呢張已儲存嘅帳單嗎？',
+    confirmFinishClose:'確定要為全部人結束呢張帳單嗎？呢個動作冚唪唥都唔可以還原。',
+    confirmSaveHistory:'想將呢張結算結果儲存喺呢部手機嗎？',
+    billClosedMsg:'帳單已結束。', finishCloseBtn:'結束帳單'
   }
 };
 
@@ -729,6 +752,9 @@ function updateStaticLabels() {
   document.getElementById('lblSeasonalSpecials').textContent= t.seasonalSpecials;
   document.getElementById('lblTypeTheseMuted').textContent  = t.typeTheseMuted;
   document.getElementById('lblApplyAll').textContent        = t.applyToAll;
+  document.getElementById('lblTabHistory').textContent       = t.tabHistory;
+  document.getElementById('lblHistoryTitle').textContent     = t.historyTitle;
+  document.getElementById('lblHistoryMuted').textContent     = t.historyMuted;
   document.getElementById('seasName').placeholder           = t.seasNamePlaceholder;
   document.getElementById('addSeas').textContent            = t.addBtn;
   document.getElementById('resetPrices').textContent        = t.resetPricesBtn;
@@ -915,9 +941,18 @@ function renderPeopleCount() {
   plusBtn.disabled = tally.people.length >= MAX_PEOPLE;
   plusBtn.title    = tally.people.length >= MAX_PEOPLE ? i18n[currentLang].maxPeopleMsg : '';
 
+  // Online, this button has no synced "clear" equivalent -- repurpose the
+  // same slot as "Finish & Close" instead of leaving it permanently disabled.
   const newBillBtn = document.getElementById('newBill');
-  newBillBtn.disabled = isOnline;
-  newBillBtn.title    = isOnline ? i18n[currentLang].onlineEditLockedTitle : '';
+  newBillBtn.disabled = false;
+  newBillBtn.title    = '';
+  if (isOnline) {
+    newBillBtn.textContent = i18n[currentLang].finishCloseBtn;
+    newBillBtn.onclick = finishAndClose;
+  } else {
+    newBillBtn.textContent = i18n[currentLang].newBill;
+    newBillBtn.onclick = newBill;
+  }
 }
 
 function setPeople(delta) {
@@ -1477,6 +1512,8 @@ function subscribeToRoom(billId) {
         payload => applyRemoteDinerRename(payload.new))
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'diners', filter: `bill_id=eq.${billId}` },
         payload => applyRemoteDinerRemoval(payload.old))
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bills', filter: `id=eq.${billId}` },
+        payload => { if (payload.new.status === 'closed') handleBillClosed(); })
     .subscribe((status) => {
       const wasConnected = channelConnected;
       channelConnected = (status === 'SUBSCRIBED');
@@ -1542,6 +1579,124 @@ function applyRemoteDinerRemoval(diner) {
   renderTally();
 }
 
+// "Finish & Close" -- just asks the server to close the bill. The actual
+// save-to-history / cleanup happens in handleBillClosed(), triggered by the
+// realtime echo of that close -- the SAME path every device in the room
+// takes, including this one, so "prompt each device" (per the plan) falls
+// out naturally rather than needing special-casing for the closer.
+async function finishAndClose() {
+  const room = getRoom();
+  if (!room) return;
+  const t = i18n[currentLang];
+  if (!confirm(t.confirmFinishClose)) return;
+  const { error } = await supabaseClient.rpc('close_bill', { p_bill: room.bill_id });
+  if (error) { console.error('close_bill failed:', error); toast(t.onlineSaveFailed); }
+}
+
+function handleBillClosed() {
+  const t = i18n[currentLang];
+  const room = getRoom();
+  const bd = computeBillBreakdown();
+  if (confirm(t.confirmSaveHistory)) {
+    saveBillToHistory(bd, room ? room.room_code : null);
+  }
+  if (roomChannel) { supabaseClient.removeChannel(roomChannel); roomChannel = null; }
+  localStorage.removeItem('kaiten_room_v1');
+  alert(t.billClosedMsg);
+  window.location.reload(); // simplest reliable path back to a clean lobby
+}
+
+function saveBillToHistory(bd, roomCode) {
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem('sushi_bill_history')) || []; } catch(e) {}
+  history.unshift({
+    closedAt: new Date().toISOString(),
+    roomCode: roomCode || null,
+    people: bd.details.map(d => ({ name: d.name, sub: d.sub, fee: d.fee, disc: d.disc, total: d.total, plates: d.plates })),
+    grandRaw: bd.grandRaw, grandFinal: bd.grandFinal, grandPlates: bd.grandPlates,
+    serviceCharge: settings.serviceCharge, discount: settings.discount
+  });
+  localStorage.setItem('sushi_bill_history', JSON.stringify(history));
+}
+
+function formatHistoryEntry(entry) {
+  const t = i18n[currentLang];
+  const n = entry.people.length;
+  const lines = [
+    currentLang === 'zh'
+      ? `🍣 迴轉壽司帳單 — ${n}${t.unitPeople}`
+      : `🍣 Kaiten Sushi Bill — ${n}${n > 1 ? t.unitPeople : t.unitPerson}`,
+    '─'.repeat(30)
+  ];
+  entry.people.forEach((d, idx) => {
+    const name = d.name || (t.personDefault + (idx + 1));
+    const parts = [money(d.sub)];
+    if (d.fee  > 0) parts.push(`+ ${money(d.fee)} ${t.svc}`);
+    if (d.disc > 0) parts.push(`− ${money(d.disc)} ${t.disc}`);
+    parts.push(`= ${money(d.total)} (${d.plates}${t.plates})`);
+    lines.push(`${name}: ${parts.join(' ')}`);
+  });
+  lines.push('─'.repeat(30));
+  lines.push(`${t.totalPlates}: ${entry.grandPlates}${t.plates}`);
+  lines.push(`${currentLang === 'zh' ? '總計' : 'Total'}: ${money(Math.round(entry.grandFinal * 100) / 100)}`);
+  return lines.join('\n');
+}
+
+function exportHistoryEntryJson(entry) {
+  const blob = new Blob([JSON.stringify(entry, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `sushi-bill-${entry.roomCode || 'offline'}-${entry.closedAt.slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function renderHistory() {
+  const t = i18n[currentLang];
+  const list = document.getElementById('historyList');
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem('sushi_bill_history')) || []; } catch(e) {}
+
+  list.innerHTML = '';
+  if (!history.length) {
+    list.innerHTML = `<p class="muted" style="margin:6px 2px">${t.noHistoryMsg}</p>`;
+    return;
+  }
+
+  history.forEach((entry, idx) => {
+    const card = document.createElement('div'); card.className = 'card';
+    const date = new Date(entry.closedAt).toLocaleString(currentLang === 'zh' ? 'zh-HK' : 'en-US');
+    const roomLabel = entry.roomCode ? ` · ${entry.roomCode}` : '';
+    card.innerHTML = `
+      <div style="font-weight:700">${escapeHtml(date)}${escapeHtml(roomLabel)}</div>
+      <div class="muted" style="font-size:13px; margin-top:2px;">${entry.people.length}${t.unitPeople} · ${entry.grandPlates}${t.plates} · <b style="color:var(--accent)">${money(entry.grandFinal)}</b></div>
+      <div class="footer-actions">
+        <button class="btn ghost sm" data-action="copy">${t.copyBill}</button>
+        <button class="btn ghost sm" data-action="export">${t.exportJsonBtn}</button>
+        <button class="btn ghost sm" data-action="delete">${t.delTitle}</button>
+      </div>
+    `;
+    card.querySelector('[data-action="copy"]').onclick = () => {
+      const text = formatHistoryEntry(entry);
+      navigator.clipboard.writeText(text).then(() => toast(t.copiedToast)).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta); toast(t.copiedToast);
+      });
+    };
+    card.querySelector('[data-action="export"]').onclick = () => exportHistoryEntryJson(entry);
+    card.querySelector('[data-action="delete"]').onclick = () => {
+      if (!confirm(t.confirmDeleteHistory)) return;
+      history.splice(idx, 1);
+      localStorage.setItem('sushi_bill_history', JSON.stringify(history));
+      renderHistory();
+    };
+    list.appendChild(card);
+  });
+}
+
 /* ── actions ── */
 function addSeasonal() {
   const t     = i18n[currentLang];
@@ -1584,6 +1739,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     tab.classList.add('active');
     document.getElementById(tab.dataset.tab).classList.add('active');
     document.getElementById('grandBar').style.display = tab.dataset.tab === 'tally' ? 'flex' : 'none';
+    if (tab.dataset.tab === 'history') renderHistory();
   };
 });
 
@@ -1627,7 +1783,6 @@ document.getElementById('discountAmount').onchange = e => {
 document.getElementById('addSeas').onclick     = addSeasonal;
 document.getElementById('seasName').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('seasPrice').focus(); });
 document.getElementById('seasPrice').addEventListener('keydown', e => { if (e.key==='Enter') addSeasonal(); });
-document.getElementById('newBill').onclick     = newBill;
 document.getElementById('copyBill').onclick    = copyBillSummary;
 document.getElementById('resetPrices').onclick = resetPrices;
 document.getElementById('langToggleBtn').onclick = () => setLanguage(currentLang === 'en' ? 'zh' : 'en');
