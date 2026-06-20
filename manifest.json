@@ -1,0 +1,27 @@
+{
+  "id": "sushi-split",
+  "name": "數碟郎 sushi split",
+  "short_name": "sushi split",
+  "description": "數碟郎 — 迴轉壽司分帳機 — Kaiten sushi bill splitter",
+  "start_url": "./sushi-split.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#D84A46",
+  "theme_color": "#D84A46",
+  "orientation": "portrait-primary",
+  "lang": "zh-Hant",
+  "icons": [
+    {
+      "src": "./sushiicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./sushiicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

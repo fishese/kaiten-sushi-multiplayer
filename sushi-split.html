@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>數碟郎 — 迴轉壽司分帳機</title>
+<style>
+  :root{
+    --bg: #F9F6F0;
+    --card: rgba(255, 255, 255, 0.85);
+    --ink: #3A3532;
+    --muted: #968D85;
+    --line: #EAE3D9;
+    --accent: #D84A46;
+    --accent2: #5F8F75;
+    --accent-glow: rgba(216, 74, 70, 0.12);
+    --shadow: 0 4px 12px rgba(58, 53, 50, 0.04), 0 1px 3px rgba(58, 53, 50, 0.02);
+    --shadow-lift: 0 8px 24px rgba(216, 74, 70, 0.08), 0 2px 8px rgba(58, 53, 50, 0.04);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='40' viewBox='0 0 80 40'%3E%3Cg fill='%23F9F6F0' stroke='%23EAE3D9' stroke-width='1'%3E%3Ccircle cx='0' cy='0' r='20'/%3E%3Ccircle cx='0' cy='0' r='15'/%3E%3Ccircle cx='0' cy='0' r='10'/%3E%3Ccircle cx='0' cy='0' r='5'/%3E%3Ccircle cx='40' cy='0' r='20'/%3E%3Ccircle cx='40' cy='0' r='15'/%3E%3Ccircle cx='40' cy='0' r='10'/%3E%3Ccircle cx='40' cy='0' r='5'/%3E%3Ccircle cx='80' cy='0' r='20'/%3E%3Ccircle cx='80' cy='0' r='15'/%3E%3Ccircle cx='80' cy='0' r='10'/%3E%3Ccircle cx='80' cy='0' r='5'/%3E%3Ccircle cx='20' cy='20' r='20'/%3E%3Ccircle cx='20' cy='20' r='15'/%3E%3Ccircle cx='20' cy='20' r='10'/%3E%3Ccircle cx='20' cy='20' r='5'/%3E%3Ccircle cx='60' cy='20' r='20'/%3E%3Ccircle cx='60' cy='20' r='15'/%3E%3Ccircle cx='60' cy='20' r='10'/%3E%3Ccircle cx='60' cy='20' r='5'/%3E%3Ccircle cx='0' cy='40' r='20'/%3E%3Ccircle cx='0' cy='40' r='15'/%3E%3Ccircle cx='0' cy='40' r='10'/%3E%3Ccircle cx='0' cy='40' r='5'/%3E%3Ccircle cx='40' cy='40' r='20'/%3E%3Ccircle cx='40' cy='40' r='15'/%3E%3Ccircle cx='40' cy='40' r='10'/%3E%3Ccircle cx='40' cy='40' r='5'/%3E%3Ccircle cx='80' cy='40' r='20'/%3E%3Ccircle cx='80' cy='40' r='15'/%3E%3Ccircle cx='80' cy='40' r='10'/%3E%3Ccircle cx='80' cy='40' r='5'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 80px 40px;
+  }
+
+  /* ── header (COMPACT) ── */
+  .header-top {
+    background: linear-gradient(135deg, #E86A66 0%, #D84A46 100%);
+    color: #fff; padding: 8px 16px 4px;
+  }
+  .header-top h1 {
+    margin: 0 auto; font-size: 17px; font-weight: 700; letter-spacing: .3px;
+    max-width: 760px; display: flex; align-items: center; gap: 8px;
+  }
+  
+  .sticky-tabs {
+    position: sticky; top: 0; z-index: 20;
+    background: #D84A46;
+    box-shadow: 0 4px 24px rgba(216, 74, 70, 0.25);
+    border-radius: 0 0 16px 16px;
+    padding: 0px 16px 8px;
+  }
+  .tabs-row {
+    display: flex; justify-content: space-between; align-items: center;
+    max-width: 760px; margin: 0 auto; gap: 12px;
+  }
+  .tabs {
+    display: flex; gap: 8px; flex: 1;
+  }
+  .tab {
+    flex: 1; padding: 6px 8px; border: none; border-radius: 12px; cursor: pointer;
+    background: rgba(255,255,255,.15); color: #fff; font-weight: 600; font-size: 13px; transition: .2s;
+  }
+  .tab:hover { background: rgba(255,255,255,.25); }
+  .tab.active { background: #fff; color: var(--accent); box-shadow: 0 2px 12px rgba(0,0,0,0.1); transform: translateY(-1px); }
+
+  .lang-btn {
+    background: rgba(255,255,255,.25); color: #fff; border: none;
+    padding: 6px 12px; border-radius: 12px; font-weight: 700; font-size: 13px; cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05); transition: .2s; flex-shrink: 0;
+  }
+
+  /* ── layout & graphics ── */
+  .wrap{max-width:760px; margin:0 auto; padding:16px 16px 120px;}
+  .panel{display:none; animation: fadeIn 0.3s ease;}
+  .panel.active{display:block}
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── integrated sticky nav ── */
+  .sticky-nav-wrapper {
+    position: sticky; z-index: 18;
+    display: flex; flex-direction: column;
+    margin: -8px 0 16px 0; /* Tucks grass neatly under the top card initially */
+    transition: top 0.2s;
+  }
+  .sticky-nav-inner {
+    display: flex; width: 100%; align-items: center;
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 4px 12px rgba(82, 125, 101, 0.25);
+    z-index: 1; position: relative;
+    /* Exactly identical repeating background as the grass tile */
+    background: repeating-linear-gradient(90deg, #5F8F75 0px, #5F8F75 4px, #527D65 4px, #527D65 8px);
+  }
+  .sticky-nav {
+    display: flex; gap: 8px; overflow-x: auto;
+    padding: 2px 10px 8px 12px; flex: 1;
+  }
+  .sticky-nav::-webkit-scrollbar { display: none; }
+  .sticky-nav-actions {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 0 12px 6px; border-left: 1px dashed rgba(255,255,255,0.25);
+    flex-shrink: 0;
+  }
+  #lblApplyAll { color: rgba(255,255,255,0.95) !important; }
+
+  /* compact nav tiles */
+  .nav-tile {
+    flex: 0 0 auto; background: #fff; border-radius: 12px;
+    padding: 4px 10px; min-width: 90px; max-width: 120px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: none;
+    cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+    transition: .2s;
+  }
+  .nav-tile:active { transform: scale(0.96); }
+  .nav-tile .n { font-weight: 700; font-size: 12px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav-tile .d { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .nav-tile .d b { color: var(--accent); font-size: 13px; }
+
+  /* ── cards ── */
+  .card{
+    background:var(--card); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border:1px solid rgba(255,255,255,0.6); border-radius:24px;
+    padding:18px; margin-bottom:16px; box-shadow:var(--shadow);
+    position: relative; z-index: 1;
+    scroll-margin-top: 140px;
+  }
+  .card h2{margin:0 0 12px; font-size:16px; display:flex; align-items:center; gap:8px; color:var(--ink)}
+  .card h2 .ico{font-size:18px; line-height:1}
+  .muted{color:var(--muted); font-size:13px; line-height: 1.4;}
+
+  /* ── people stepper ── */
+  .people-pick{display:flex; gap:10px; align-items:center; flex-wrap:wrap; background: rgba(0,0,0,0.02); padding: 10px 14px; border-radius: 18px;}
+  .pstepper{display:flex; align-items:center; gap:12px}
+  .pstepper button{
+    width:38px; height:38px; border-radius:14px; border:none;
+    background:#fff; font-size:20px; font-weight:700; cursor:pointer; color:var(--accent);
+    display:flex; align-items:center; justify-content:center; transition:.15s;
+    box-shadow: 0 2px 6px rgba(0,0,0,.05);
+  }
+  .pstepper button:hover:not(:disabled) { background: #FFF8F7; transform: translateY(-1px); }
+  .pstepper button:not(:disabled):active{transform:scale(.92)}
+  .pstepper button:disabled{opacity:.4; cursor:default; color: var(--muted); background: transparent; box-shadow: none; border: 1px solid var(--line);}
+  .pstepper .pnum{font-size:22px; font-weight:800; min-width:24px; text-align:center; color:var(--ink)}
+
+  /* ── person card ── */
+  .person-head{display:flex; align-items:center; gap:12px; margin-bottom:12px}
+  .person-avatar{
+    width:34px; height:34px; border-radius:12px; flex-shrink:0;
+    background:var(--accent-glow); color:var(--accent); font-size:15px; font-weight:800;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .person-head input{
+    flex:1; font-size:17px; font-weight:700; border:none; border-bottom:2px solid transparent;
+    background:transparent; padding:4px 2px; color:var(--ink); min-width:0; transition: .2s;
+  }
+  .person-head input:focus{outline:none; border-bottom-color:var(--accent)}
+  .person-head input:hover:not(:focus){ border-bottom-color:var(--line); }
+  .ptotal{text-align:right; white-space:nowrap; line-height:1.3; flex-shrink:0}
+  .ptotal .calc{display:block; font-size:12px; color:var(--muted); font-weight:500; margin-bottom: 2px;}
+  .ptotal .calc b{color:var(--accent2); font-weight:700}
+  .ptotal .calc b.disc-val{color:var(--accent)}
+  .ptotal .big{font-size:22px; font-weight:800; letter-spacing:-.5px; color: var(--accent);}
+
+  /* ── dish grid ── */
+  .dishgrid{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:12px}
+  @media(min-width:700px){.dishgrid{grid-template-columns:repeat(6,1fr)}}
+  .dish{
+    display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px;
+    padding:16px 8px 12px; border:none; border-radius:20px; background:#fff;
+    cursor:pointer; transition:transform .2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .2s, background .2s;
+    min-width:0; overflow:hidden; position: relative;
+    user-select: none; box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+  }
+  .dish:hover{box-shadow: 0 6px 16px rgba(0,0,0,0.06); transform:translateY(-2px)}
+  .dish.active{
+    background:#FFF8F7;
+    box-shadow:0 0 0 2px var(--accent), 0 4px 14px var(--accent-glow);
+  }
+  .dish.active:hover{transform:translateY(-2px); box-shadow:0 0 0 2px var(--accent), var(--shadow-lift)}
+  .ic{height:52px; display:flex; align-items:center; justify-content:center; position:relative}
+  .ic svg{width:50px; height:50px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.06));}
+  .qty-badge{
+    position:absolute; top:-2px; right:-8px;
+    background:var(--accent); color:#fff; font-size:12px; font-weight:800;
+    min-width:22px; height:22px; border-radius:11px;
+    display:flex; align-items:center; justify-content:center; padding:0 5px;
+    box-shadow:0 2px 6px rgba(216, 74, 70, 0.4); pointer-events:none; border: 2px solid #fff;
+  }
+  .dish .nm{min-width:0; width:100%}
+  .dish .nm .t{font-weight:700; font-size:14px; line-height:1.25; color: var(--ink);}
+  .dish .nm .p{font-size:13px; color:var(--muted); font-weight:600; margin-top: 2px;}
+  .seasonal-badge{display:inline-block; font-size:11px; font-weight:700; color:var(--accent2);
+    background:rgba(95, 143, 117, 0.12); padding:3px 8px; border-radius:20px}
+  .stepper{display:flex; align-items:center; justify-content:space-between; width:100%; margin-top:4px}
+  .stepper button{
+    width:34px; height:34px; flex-shrink:0; border-radius:12px; border:none;
+    background:var(--bg); font-size:18px; font-weight:700; cursor:pointer; color:var(--muted);
+    display:flex; align-items:center; justify-content:center; line-height:1; transition:.15s;
+    position: relative; z-index: 2;
+  }
+  .stepper button:hover { background: #EBE4DB; color: var(--ink); }
+  .stepper button:active{transform:scale(.85)}
+  .stepper .qty{flex:1; text-align:center; font-weight:800; font-size:17px; color: var(--ink);}
+  .qty.has{color:var(--accent)}
+  @media(max-width:380px){.dishgrid{gap:10px}}
+
+/* ── grand bar ── */
+  .grand{
+    position:fixed; bottom:12px; left:16px; right:16px; margin:0 auto; max-width:728px;
+    /* Layer 1: Frosted white wash 
+       Layer 2: Soft cream rice pattern (darker toasted-beige stroke for visibility) */
+    background: 
+      linear-gradient(rgba(255, 255, 255, 0.50), rgba(255, 255, 255, 0.50)),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Crect width='60' height='60' fill='%23FDFBF7'/%3E%3Cg fill='%23ffffff' stroke='%23C5B7A3' stroke-width='0.9'%3E%3Cellipse cx='12' cy='15' rx='3.5' ry='9' transform='rotate(30 12 15)'/%3E%3Cellipse cx='28' cy='10' rx='3' ry='8' transform='rotate(-20 28 10)'/%3E%3Cellipse cx='45' cy='12' rx='3.5' ry='9' transform='rotate(70 45 12)'/%3E%3Cellipse cx='8' cy='35' rx='3' ry='8' transform='rotate(-45 8 35)'/%3E%3Cellipse cx='25' cy='28' rx='3.5' ry='9' transform='rotate(15 25 28)'/%3E%3Cellipse cx='40' cy='32' rx='3' ry='8' transform='rotate(-60 40 32)'/%3E%3Cellipse cx='55' cy='25' rx='3.5' ry='9' transform='rotate(25 55 25)'/%3E%3Cellipse cx='18' cy='48' rx='3.5' ry='9' transform='rotate(50 18 48)'/%3E%3Cellipse cx='35' cy='48' rx='3' ry='8' transform='rotate(-10 35 48)'/%3E%3Cellipse cx='52' cy='45' rx='3.5' ry='9' transform='rotate(40 52 45)'/%3E%3Cellipse cx='0' cy='5' rx='3.5' ry='9' transform='rotate(-15 0 5)'/%3E%3Cellipse cx='60' cy='5' rx='3.5' ry='9' transform='rotate(-15 60 5)'/%3E%3Cellipse cx='30' cy='0' rx='3.5' ry='9' transform='rotate(80 30 0)'/%3E%3Cellipse cx='30' cy='60' rx='3.5' ry='9' transform='rotate(80 30 60)'/%3E%3Cellipse cx='0' cy='55' rx='3' ry='8' transform='rotate(35 0 55)'/%3E%3Cellipse cx='60' cy='55' rx='3' ry='8' transform='rotate(35 60 55)'/%3E%3Cellipse cx='22' cy='50' rx='3.5' ry='9' transform='rotate(80 22 50)'/%3E%3Cellipse cx='38' cy='52' rx='3.5' ry='9' transform='rotate(-15 38 52)'/%3E%3Cellipse cx='52' cy='50' rx='3' ry='8' transform='rotate(30 52 50)'/%3E%3Cellipse cx='0' cy='15' rx='3.5' ry='9' transform='rotate(10 0 15)'/%3E%3Cellipse cx='60' cy='15' rx='3.5' ry='9' transform='rotate(10 60 15)'/%3E%3Cellipse cx='30' cy='0' rx='3' ry='8' transform='rotate(40 30 0)'/%3E%3Cellipse cx='30' cy='60' rx='3' ry='8' transform='rotate(40 30 60)'/%3E%3Cellipse cx='0' cy='40' rx='3.5' ry='9' transform='rotate(-20 0 40)'/%3E%3Cellipse cx='60' cy='40' rx='3.5' ry='9' transform='rotate(-20 60 40)'/%3E%3C/g%3E%3C/svg%3E") repeat;
+    background-size: cover, 60px 60px;
+    backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,0.6); border-radius:28px;
+    box-shadow:0 12px 32px rgba(58, 53, 50,.12), 0 2px 8px rgba(58, 53, 50,.05);
+    padding:12px 20px; z-index:15;
+  }
+  .grand .row{display:flex; justify-content:space-between; align-items:center}
+  
+.grand .g {
+    font-size: 28px; 
+    font-weight: 800; 
+    letter-spacing: -0.5px; 
+    color: #B5322E; /* Kept the deeper red for better contrast */
+    text-shadow: 
+      /* Create a thick 2px white outline */
+      -2px -2px 0 #fff,  2px -2px 0 #fff,
+      -2px  2px 0 #fff,  2px  2px 0 #fff,
+      -2px  0   0 #fff,  2px  0   0 #fff,
+       0   -2px 0 #fff,  0    2px 0 #fff,
+      /* Fill in the corners so the stroke is smooth, not jagged */
+      -1px -2px 0 #fff,  1px -2px 0 #fff,
+      -2px -1px 0 #fff,  2px -1px 0 #fff,
+      -2px  1px 0 #fff,  2px  1px 0 #fff,
+      -1px  2px 0 #fff,  1px  2px 0 #fff,
+      /* Add a soft dark shadow behind the outline to pop off the rice */
+       0    4px 8px rgba(58, 53, 50, 0.15);
+  }
+  
+  .grand .sub {
+    font-size: 15px; 
+    color: var(--ink); 
+    font-weight: 700;
+    text-shadow: 
+      /* 1.5px white outline for the smaller text so it doesn't blob together */
+      -1.5px -1.5px 0 #fff,  1.5px -1.5px 0 #fff,
+      -1.5px  1.5px 0 #fff,  1.5px  1.5px 0 #fff,
+      -1.5px  0     0 #fff,  1.5px  0     0 #fff,
+       0     -1.5px 0 #fff,  0      1.5px 0 #fff,
+      /* Soft dark shadow */
+       0      2px   4px rgba(58, 53, 50, 0.1);
+  }
+
+  /* ── settings rows ── */
+  .srow{display:flex; align-items:center; gap:12px; padding:12px 4px; border-top:1px dashed var(--line)}
+  .srow:first-of-type{border-top:none}
+  .srow .nm{flex:1; font-size:15px; font-weight: 500;}
+  input.price, input.text{
+    border:none; border-radius:14px; padding:10px 12px; background: var(--bg);
+    font-size:16px; color:var(--ink); transition:.2s; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+  }
+  input.price:focus, input.text:focus{outline:none; background:#fff; box-shadow: 0 0 0 2px var(--accent-glow), inset 0 2px 4px rgba(0,0,0,0.02);}
+  input.text{width:100%}
+  .pricewrap{position:relative; display:inline-flex; align-items:center}
+  .pricewrap span{position:absolute; left:12px; color:var(--muted); font-size:14px; pointer-events:none; font-weight: 600;}
+  .pricewrap input{padding-left:24px; width:90px; font-weight: 600;}
+  .seas{display:flex; gap:10px; align-items:center; padding:12px 4px; border-top:1px dashed var(--line)}
+  .seas .nm{flex:1}
+
+  /* ── buttons ── */
+  .btn{border:none; border-radius:16px; padding:12px 18px; font-weight:700; font-size:14px; cursor:pointer; transition:.2s; display: inline-flex; align-items: center; justify-content: center;}
+  .btn.primary{background:var(--accent); color:#fff; box-shadow:0 4px 12px var(--accent-glow)}
+  .btn.primary:hover{background: #C43B38; transform: translateY(-1px); box-shadow:0 6px 16px rgba(216, 74, 70, 0.2)}
+  .btn.primary:active{transform:scale(.96)}
+  .btn.ghost{background:rgba(0,0,0,0.04); color:var(--ink)}
+  .btn.ghost:hover{background:rgba(0,0,0,0.08)}
+  .btn.ghost:active{background:rgba(0,0,0,0.12); transform:scale(.96)}
+  .btn.sm{padding:8px 14px; font-size:13px; border-radius: 12px;}
+  .del{background:var(--bg); border:none; color:var(--accent); font-size:22px; border-radius: 12px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor:pointer; transition: .2s;}
+  .del:hover { background: #FFF8F7; transform: scale(1.05); }
+  .addrow{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center; background: rgba(0,0,0,0.02); padding: 12px; border-radius: 20px;}
+  .footer-actions{display:flex; gap:8px; margin:16px 0 0}
+
+  /* ── toast ── */
+  .toast{
+    position:fixed; left:50%; bottom:100px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:#fff; padding:12px 24px; border-radius:30px;
+    font-size:14px; font-weight:600; opacity:0; pointer-events:none;
+    transition:.3s cubic-bezier(0.34, 1.56, 0.64, 1); z-index:50; white-space:nowrap;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  /* ── toggle switch ── */
+  .toggle{position:relative; width:48px; height:26px; flex-shrink:0; cursor:pointer}
+  .toggle input{opacity:0; width:0; height:0; position:absolute}
+  .toggle-slider{
+    position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
+    background:var(--line); border-radius:13px; transition:.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .toggle-slider:before{
+    content:''; position:absolute; height:20px; width:20px;
+    left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow:0 2px 5px rgba(0,0,0,.15);
+  }
+  .toggle input:checked + .toggle-slider{background:var(--accent2)}
+  .toggle input:checked + .toggle-slider:before{transform:translateX(22px)}
+
+  /* small toggle mapped for dark green nav bg */
+  .toggle.sm { width: 34px; height: 20px; }
+  .toggle.sm .toggle-slider { border-radius: 10px; background: rgba(0,0,0,0.25); }
+  .toggle.sm .toggle-slider:before { height: 14px; width: 14px; left: 3px; bottom: 3px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); background: #fff; }
+  .toggle.sm input:checked + .toggle-slider { background: rgba(255,255,255,0.9); }
+  .toggle.sm input:checked + .toggle-slider:before { transform: translateX(14px); background: var(--accent); }
+
+  /* ── discount radios ── */
+  .radio-group{display:flex; gap:16px; align-items:center; flex-wrap:wrap}
+  .radio-group label{display:flex; align-items:center; gap:6px; font-size:14px; cursor:pointer; font-weight:600}
+  .radio-group input[type=radio]{accent-color:var(--accent); width:18px; height:18px; cursor:pointer}
+  .amt-wrap{display:flex; align-items:center; gap:8px}
+  .amt-wrap .unit{font-size:15px; font-weight:700; color:var(--muted); min-width:16px}
+  #discountFields{display:none; background: rgba(0,0,0,0.02); padding: 0 14px 14px; border-radius: 16px; margin-top: 10px;}
+  #discountFields.open{display:block; animation: fadeIn 0.3s ease;}
+</style>
+</head>
+<body>
+
+<div class="header-top">
+  <h1 id="lblHeaderTitle">🍣 數碟郎 — 迴轉壽司分帳機</h1>
+</div>
+
+<div class="sticky-tabs">
+  <div class="tabs-row">
+    <div class="tabs">
+      <button class="tab active" data-tab="tally"    id="lblTabTally">計帳點餐</button>
+      <button class="tab"        data-tab="settings" id="lblTabSettings">單價設定</button>
+    </div>
+    <button id="langToggleBtn" class="lang-btn">EN</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section id="tally" class="panel active">
+
+    <div class="card" style="margin-bottom: 0;">
+      <h2 id="lblWhosEating">今日幾位用餐？</h2>
+      <div class="people-pick">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span class="muted" id="lblPeople" style="font-weight: 600;">人數：</span>
+          <div class="pstepper">
+            <button id="peopleMinus">–</button>
+            <span class="pnum" id="peopleNum">1</span>
+            <button id="peoplePlus">+</button>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-left:auto;">
+          <button class="btn ghost sm" id="copyBill">複製帳單</button>
+          <button class="btn ghost sm" id="newBill">清除帳單</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="stickyNavWrapper" class="sticky-nav-wrapper" style="display:none;">
+      
+      <div class="sugi-divider" style="height: 24px; width: 100%; margin-bottom: -1px; position: relative; z-index: 2;">
+        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="sugi-stripes" width="8" height="24" patternUnits="userSpaceOnUse">
+              <rect width="4" height="24" fill="#5F8F75"/>
+              <rect x="4" width="4" height="24" fill="#527D65"/>
+            </pattern>
+            <pattern id="sugi-edge" width="200" height="24" patternUnits="userSpaceOnUse">
+              <path d="M0,12 L25,24 L50,4 L75,20 L100,2 L125,22 L150,6 L175,18 L200,12 L200,24 L0,24 Z" fill="url(#sugi-stripes)"/>
+              <path d="M0,12 L25,24 L50,4 L75,20 L100,2 L125,22 L150,6 L175,18 L200,12" fill="none" stroke="#466D57" stroke-width="1.5" stroke-linejoin="round"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#sugi-edge)"/>
+        </svg>
+      </div>
+
+      <div class="sticky-nav-inner">
+        <div id="stickyNav" class="sticky-nav"></div>
+        <div class="sticky-nav-actions">
+          <label class="toggle sm" style="margin-bottom: 4px;"><input type="checkbox" id="applyAllToggle"><span class="toggle-slider"></span></label>
+          <span class="muted" id="lblApplyAll" style="font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">All In</span>
+        </div>
+      </div>
+
+    </div>
+    
+    <div id="peopleContainer"></div>
+  </section>
+
+  <section id="settings" class="panel">
+
+    <div class="card">
+      <h2><span class="ico">⚙️</span> <span id="lblBillSettings">帳單設定</span></h2>
+      <div class="srow" style="border-top:none">
+        <div class="nm" id="lblSvcCharge">10% 服務費</div>
+        <label class="toggle"><input type="checkbox" id="svcToggle" checked><span class="toggle-slider"></span></label>
+      </div>
+      <div class="srow">
+        <div class="nm" id="lblRounding">總額四捨五入至整數</div>
+        <label class="toggle"><input type="checkbox" id="roundToggle"><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="ico">🏷️</span> <span id="lblDiscountTitle">折扣</span></h2>
+      <div class="srow" style="border-top:none">
+        <div class="nm" id="lblDiscountToggle">套用折扣</div>
+        <label class="toggle"><input type="checkbox" id="discountToggle"><span class="toggle-slider"></span></label>
+      </div>
+      <div id="discountFields">
+        <div class="srow" style="border-top:none">
+          <div class="nm" id="lblDiscountType">類型</div>
+          <div class="radio-group">
+            <label><input type="radio" name="discType" id="discTypePct"   value="pct"   checked> <span id="lblDiscPct">百分比（%）</span></label>
+            <label><input type="radio" name="discType" id="discTypeFixed" value="fixed">          <span id="lblDiscFixed">固定金額（$）</span></label>
+          </div>
+        </div>
+        <div class="srow">
+          <div class="nm" id="lblDiscountAmt">折扣金額</div>
+          <div class="amt-wrap">
+            <input class="price" id="discountAmount" type="number" step="1" min="0" placeholder="0" style="width:88px;padding-left:10px">
+            <span class="unit" id="discAmtUnit">%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="ico">🍽️</span> <span id="lblStandardDishes">標準碟類</span></h2>
+      <p class="muted" style="margin-top:-4px" id="lblEditPricesMuted">可隨時修改單價。這些項目在計帳頁面會顯示對應圖示。</p>
+      <div id="standardList"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="ico">✨</span> <span id="lblSeasonalSpecials">季節限定 / 特別單點</span></h2>
+      <p class="muted" style="margin-top:-4px" id="lblTypeTheseMuted">在此手動新增項目。這些項目在計帳頁面只會顯示名稱與價格（不含圖示）。</p>
+      <div id="seasonalList"></div>
+      <div class="addrow">
+        <input class="text" id="seasName" placeholder="品名（例如：特選海膽）" style="flex:1;min-width:160px">
+        <div class="pricewrap"><span>$</span><input class="price" id="seasPrice" type="number" step="0.5" placeholder="0"></div>
+        <button class="btn primary sm" id="addSeas">新增項目</button>
+      </div>
+    </div>
+
+    <div class="footer-actions">
+      <button class="btn ghost sm" id="resetPrices">重設回預設碟價</button>
+    </div>
+  </section>
+</div>
+
+<div class="grand" id="grandBar">
+  <div class="row">
+    <div><div class="sub" id="grandSub">總計金額</div></div>
+    <div class="g" id="grandTotal">$0</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<footer style="text-align:center; padding: 8px 0 80px; pointer-events: auto;">
+  <a href="index.html" style="color: var(--muted); font-size: 11px; text-decoration: none; opacity: 0.45; letter-spacing: 0.5px;">0oo.fish.oo0</a>
+</footer>
+
+<script>
+const LS_SETTINGS = 'kaiten_settings_v1';
+const LS_TALLY    = 'kaiten_tally_v1';
+const LS_LANG     = 'kaiten_lang_v1';
+const MAX_PEOPLE  = 8;
+const SERVICE_RATE = 0.10;
+
+const DEFAULT_STANDARD = [
+  {id:'red',      name:'Red Plate',    price:12, color:'#d62828', sushi:'salmon'},
+  {id:'silver',   name:'Silver Plate', price:17, color:'#8fa0b0', sushi:'tuna'},
+  {id:'gold',     name:'Gold Plate',   price:22, color:'#e3a72f', sushi:'tamago'},
+  {id:'black',    name:'Black Plate',  price:27, color:'#2b2b2b', sushi:'ebi'},
+  {id:'sundae',   name:'Sundae',       price:27, kind:'sundae'},
+  {id:'discount', name:'Discount',     price:10, kind:'discount'}
+];
+
+const i18n = {
+  en: {
+    title:'Kaiten Sushi Bill Splitter', headerTitle:'🍣 Kaiten Sushi — Bill Splitter',
+    tabTally:'Tally', tabSettings:'Settings',
+    whosEating:"Who's eating?", people:'People:',
+    newBill:'New bill', copyBill:'Copy bill',
+    billSettings:'Bill settings', svcChargeLabel:'10% service charge',
+    roundingLabel:'Round totals to nearest $1',
+    discountTitle:'Discount', discountToggle:'Apply discount',
+    discountType:'Type', discPct:'Percentage (%)', discFixed:'Fixed amount ($)',
+    discountAmt:'Amount',
+    applyToAll: 'All In', 
+    toastAddAll: 'Added One to Everyone',
+    toastToggleOn: "Everyone's in on this next order",
+    toastToggleOff: "Back to ordering one by one",
+    toastAddAllAndOff: "Added one for everyone, now back to ordering for yourself",
+    toastRemoveOne: "Remove one at a time",
+    standardDishes:'Standard dishes', editPricesMuted:'Edit prices anytime. These show with icons in the tally.',
+    seasonalSpecials:'Seasonal specials', typeTheseMuted:'Type these in. They show by name + price (no icon) in the tally.',
+    seasNamePlaceholder:'Dish name (e.g. Uni special)', addBtn:'Add',
+    resetPricesBtn:'Reset standard prices', dealSuffix:'deal',
+    noSeasonal:'No seasonal dishes yet.', personDefault:'Person ',
+    svc:'svc', disc:'disc',
+    totalBillBase:'Total bill', countPrefix:'', inclOpen:' (', inclClose:')', inclSep:', ', noteSvc:'incl. 10% svc', noteDisc:'less discount',
+    unitPerson:' person', unitPeople:' people',
+    msgEnterName:'Enter a name', msgEnterPrice:'Enter a price greater than or equal to 0',
+    msgAdded:'Added "{name}"',
+    confirmNewBill:'Clear all tallies and start a new bill? (Prices & seasonal dishes are kept.)',
+    msgNewBillStarted:'New bill started',
+    confirmResetPrices:'Reset standard plate prices to defaults?',
+    confirmRemovePerson:'Remove {name} and their tally?',
+    msgPricesReset:'Prices reset', msgPriceUpdated:'Price updated',
+    seasonalDefaultName:'Seasonal', delTitle:'Remove', seasonalBadge:'seasonal',
+    copiedToast:'Copied to clipboard!', langBtn:'中',
+    plates: ' plates', totalPlates: 'Total plates', maxPeopleMsg:'Maximum 8 people'
+  },
+  zh: {
+    title:'壽司分帳機', headerTitle:'🍣 數碟郎 — 迴轉壽司分帳機',
+    tabTally:'計帳點餐', tabSettings:'單價設定',
+    whosEating:'今日幾位用餐？', people:'人數：',
+    newBill:'清除帳單', copyBill:'複製帳單',
+    billSettings:'帳單設定', svcChargeLabel:'10% 服務費',
+    roundingLabel:'總額四捨五入至整數',
+    discountTitle:'折扣', discountToggle:'套用折扣',
+    discountType:'類型', discPct:'百分比（%）', discFixed:'固定金額（$）',
+    discountAmt:'折扣金額',
+    applyToAll: '齊齊叫', 
+    toastAddAll: '一人加一碟',
+    toastToggleOn: '呢碟你叫我又叫',
+    toastToggleOff: '自己叫番自己嘅',
+    toastAddAllAndOff: '一人加咗一碟，而家自己叫番自己嘅',
+    toastRemoveOne: '減就一個一個嚟',
+    standardDishes:'標準碟類', editPricesMuted:'可隨時修改單價。這些項目在計帳頁面會顯示對應圖示。',
+    seasonalSpecials:'季節限定 / 特別單點', typeTheseMuted:'在此手動新增項目。這些項目在計帳頁面只會顯示名稱與價格（不含圖示）。',
+    seasNamePlaceholder:'品名（例如：特選海膽）', addBtn:'新增項目',
+    resetPricesBtn:'重設回預設碟價', dealSuffix:'特價碟',
+    noSeasonal:'目前無自訂限定項目。', personDefault:'用餐者 ',
+    svc:'服務費', disc:'折扣',
+    totalBillBase:'總計金額', countPrefix:'共 ', inclOpen:'（', inclClose:'）', inclSep:'、', noteSvc:'含10%服務費', noteDisc:'已折扣',
+    unitPerson:' 人', unitPeople:' 人',
+    msgEnterName:'請輸入名稱', msgEnterPrice:'請輸入大於或等於 0 的價格',
+    msgAdded:'已新增「{name}」',
+    confirmNewBill:'確定要清除所有計帳並開始新帳單嗎？（將保留目前的單價與限定項目設定）',
+    msgNewBillStarted:'已開啟新帳單',
+    confirmResetPrices:'確定要將標準碟價重設回預設值嗎？',
+    confirmRemovePerson:'確定要移除「{name}」及其點餐記錄嗎？',
+    msgPricesReset:'價格已重設', msgPriceUpdated:'價格已更新',
+    seasonalDefaultName:'限定項目', delTitle:'刪除', seasonalBadge:'限定',
+    copiedToast:'已複製到剪貼板！', langBtn:'EN',
+    plates: ' 碟', totalPlates: '總碟數', maxPeopleMsg:'最多 8 人'
+  }
+};
+
+let currentLang = localStorage.getItem(LS_LANG) || 'zh';
+let settings = loadSettings();
+let tally    = loadTally();
+window.dishRefreshers = {}; // Registry to decouple DOM from refresh actions
+
+/* ── persistence ── */
+function loadSettings() {
+  let s;
+  try { s = JSON.parse(localStorage.getItem(LS_SETTINGS)); } catch(e) {}
+  if (!s || !s.standard || !s.seasonal) return fresh();
+  if (s.serviceCharge === undefined) s.serviceCharge = true;
+  if (s.rounding      === undefined) s.rounding      = false;
+  if (!s.discount) s.discount = { enabled:false, type:'pct', amount:0 };
+  s.standard.forEach(d => {
+    if (!d.sushi && !d.kind) {
+      const map = {red:'salmon',silver:'tuna',gold:'tamago',black:'ebi'};
+      d.sushi = map[d.id] || 'salmon';
+    }
+    if (d.id === 'silver' && d.color === '#b8bcc2') {
+      d.color = '#8fa0b0';
+    }
+  });
+  // Add any default plates introduced in a newer version that an older save is missing
+  DEFAULT_STANDARD.forEach(def => {
+    if (!s.standard.some(d => d.id === def.id)) s.standard.push(structuredClone(def));
+  });
+  return s;
+}
+function fresh() {
+  return {
+    standard:structuredClone(DEFAULT_STANDARD), seasonal:[],
+    serviceCharge:true, rounding:false,
+    discount:{enabled:false, type:'pct', amount:0}
+  };
+}
+function saveSettings() { localStorage.setItem(LS_SETTINGS, JSON.stringify(settings)); }
+function loadTally() {
+  try {
+    const t = JSON.parse(localStorage.getItem(LS_TALLY));
+    if (t && t.people && t.people.length) return t;
+  } catch(e) {}
+  return { people:[{name:'', counts:{}}] };
+}
+function saveTally() { localStorage.setItem(LS_TALLY, JSON.stringify(tally)); }
+
+/* ── i18n ── */
+function updateStaticLabels() {
+  const t = i18n[currentLang];
+  document.documentElement.lang = currentLang === 'zh' ? 'zh-Hant' : 'en';
+  document.title = t.title;
+  document.getElementById('lblHeaderTitle').textContent     = t.headerTitle;
+  document.getElementById('lblTabTally').textContent        = t.tabTally;
+  document.getElementById('lblTabSettings').textContent     = t.tabSettings;
+  document.getElementById('lblWhosEating').textContent      = t.whosEating;
+  document.getElementById('lblPeople').textContent          = t.people;
+  document.getElementById('newBill').textContent            = t.newBill;
+  document.getElementById('copyBill').textContent           = t.copyBill;
+  document.getElementById('lblBillSettings').textContent    = t.billSettings;
+  document.getElementById('lblSvcCharge').textContent       = t.svcChargeLabel;
+  document.getElementById('lblRounding').textContent        = t.roundingLabel;
+  document.getElementById('lblDiscountTitle').textContent   = t.discountTitle;
+  document.getElementById('lblDiscountToggle').textContent  = t.discountToggle;
+  document.getElementById('lblDiscountType').textContent    = t.discountType;
+  document.getElementById('lblDiscPct').textContent         = t.discPct;
+  document.getElementById('lblDiscFixed').textContent       = t.discFixed;
+  document.getElementById('lblDiscountAmt').textContent     = t.discountAmt;
+  document.getElementById('lblStandardDishes').textContent  = t.standardDishes;
+  document.getElementById('lblEditPricesMuted').textContent = t.editPricesMuted;
+  document.getElementById('lblSeasonalSpecials').textContent= t.seasonalSpecials;
+  document.getElementById('lblTypeTheseMuted').textContent  = t.typeTheseMuted;
+  document.getElementById('lblApplyAll').textContent        = t.applyToAll;
+  document.getElementById('seasName').placeholder           = t.seasNamePlaceholder;
+  document.getElementById('addSeas').textContent            = t.addBtn;
+  document.getElementById('resetPrices').textContent        = t.resetPricesBtn;
+  document.getElementById('langToggleBtn').textContent      = t.langBtn;
+}
+function getDishName(d) {
+  if (d.seasonal) return d.name;
+  const n = {
+    red:{en:'Red Plate',zh:'紅碟'}, silver:{en:'Silver Plate',zh:'銀碟'},
+    gold:{en:'Gold Plate',zh:'金碟'}, black:{en:'Black Plate',zh:'黑碟'},
+    sundae:{en:'Sundae',zh:'新地'}, discount:{en:'Discount',zh:'特價碟'}
+  };
+  return n[d.id] ? n[d.id][currentLang] : d.name;
+}
+function setLanguage(lang) {
+  currentLang = lang; localStorage.setItem(LS_LANG, lang);
+  updateStaticLabels(); renderTally(); renderSettings();
+}
+
+/* ── SVG icons ── */
+function shade(hex,p){
+  let c=hex.replace('#',''); if(c.length===3)c=c.split('').map(x=>x+x).join('');
+  let r=parseInt(c.substr(0,2),16),g=parseInt(c.substr(2,2),16),b=parseInt(c.substr(4,2),16);
+  const f=x=>Math.max(0,Math.min(255,Math.round(x+(p/100)*255)));
+  return '#'+[f(r),f(g),f(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+const TOPPINGS = {
+  salmon:`
+    <path d="M15 24 q9 -7 18 0 q-9 4 -18 0 z" fill="#f28060"/>
+    <path d="M17.5 20.5 q6 -4.5 12 -1" stroke="#fff" stroke-width="1.9" stroke-linecap="round" fill="none" opacity=".42"/>
+    <path d="M16 23.5 q8 -2 16 0" stroke="#c05838" stroke-width=".8" fill="none" opacity=".5"/>`,
+  tuna:`
+    <path d="M15 24.5 q3.5 -7 9 -5.5 q5.5 1.5 9 5.5 q-9 3.5 -18 0 z" fill="#bf3048"/>
+    <path d="M16 21 q8 -2 16 1" stroke="#8c1e30" stroke-width=".9" fill="none" opacity=".45"/>
+    <path d="M15.5 24 q8.5 -1 17 0" stroke="#8c1e30" stroke-width=".6" fill="none" opacity=".32"/>`,
+  tamago:`
+    <path d="M15.5 19.5 q8.5 -1.5 17 0 l0 5 q-8.5 2 -17 0 z" fill="#f0c22a"/>
+    <path d="M15.5 24.5 l17 -0.4 l0 1.8 q-8.5 1.2 -17 0 z" fill="#1e2010" opacity=".65"/>
+    <path d="M17 21.5 q7 -1.5 14 0.5" stroke="#fff" stroke-width="1.1" fill="none" opacity=".28"/>`,
+  ebi:`
+    <path d="M17 25 q-1 -9 7 -7 q8 2 9 7 q-7 3 -16 0 z" fill="#e07030"/>
+    <path d="M18.5 21.5 q5 -4 11 0.5" stroke="#b04e18" stroke-width=".9" fill="none" opacity=".52"/>
+    <path d="M17.5 23.5 q5.5 -2 13 0.5" stroke="#b04e18" stroke-width=".7" fill="none" opacity=".4"/>
+    <path d="M23 16 q2 -3 5 -1 q-1 2.5 -2.5 2.5 z" fill="#f08040" opacity=".8"/>`
+};
+
+function plateIcon(color, sushi='salmon') {
+  return `<svg width="36" height="36" viewBox="0 0 48 48">
+    <ellipse cx="24" cy="30" rx="20" ry="9" fill="${color}"/>
+    <ellipse cx="24" cy="28" rx="20" ry="9" fill="${shade(color,18)}"/>
+    <ellipse cx="24" cy="27" rx="13" ry="5.5" fill="${shade(color,-14)}"/>
+    <ellipse cx="24" cy="25" rx="9" ry="4" fill="#f3e9d8"/>
+    ${TOPPINGS[sushi] || TOPPINGS.salmon}
+  </svg>`;
+}
+
+function sundaeIcon() {
+  return `<svg width="36" height="36" viewBox="0 0 48 48">
+    <path d="M16 22 h16 l-3 18 a5 5 0 0 1 -10 0 z" fill="#ffe3ef" stroke="#e9b8cc" stroke-width="1"/>
+    <ellipse cx="24" cy="22" rx="9" ry="6" fill="#fff1f6"/>
+    <circle cx="19" cy="18" r="5.5" fill="#f7a8c4"/>
+    <circle cx="27" cy="17" r="6" fill="#f6d186"/>
+    <circle cx="24" cy="13" r="5" fill="#b5e2c9"/>
+    <circle cx="24" cy="8.5" r="2.2" fill="#d6453f"/>
+  </svg>`;
+}
+
+function discountIcon() {
+  return `<svg width="36" height="36" viewBox="0 0 48 48">
+    <ellipse cx="24" cy="30" rx="20" ry="9" fill="#b8b8b8"/>
+    <ellipse cx="24" cy="28" rx="20" ry="9" fill="#ffffff"/>
+    <ellipse cx="24" cy="27" rx="13" ry="5.5" fill="#e5e5e5"/>
+    <ellipse cx="24" cy="25" rx="9" ry="4" fill="#f3e9d8"/>
+
+    <path d="M 14.5 21 L 14.5 24 A 4.5 2.5 0 0 0 23.5 24 L 23.5 21 Z" fill="#11130a"/>
+    <ellipse cx="19" cy="21" rx="4.5" ry="2.5" fill="#1e2010"/>
+    <ellipse cx="19" cy="21" rx="3.5" ry="1.8" fill="#f9f6f0"/>
+    <circle cx="18" cy="21" r="1" fill="#f28060"/>
+    <rect x="19.2" y="20.2" width="1.2" height="1.2" fill="#f0c22a"/>
+    <circle cx="19.5" cy="21.5" r="0.7" fill="#268b69"/>
+
+    <path d="M 24.5 23 L 24.5 26 A 4.5 2.5 0 0 0 33.5 26 L 33.5 23 Z" fill="#11130a"/>
+    <ellipse cx="29" cy="23" rx="4.5" ry="2.5" fill="#1e2010"/>
+    <ellipse cx="29" cy="23" rx="3.5" ry="1.8" fill="#f9f6f0"/>
+    <circle cx="28" cy="23" r="1" fill="#f28060"/>
+    <rect x="29.2" y="22.2" width="1.2" height="1.2" fill="#f0c22a"/>
+    <circle cx="29.5" cy="23.5" r="0.7" fill="#268b69"/>
+
+    <g transform="translate(35,12)">
+      <path d="M0 -7 L1.8 -2.2 L7 -2.2 L2.8 0.8 L4.5 6 L0 2.8 L-4.5 6 L-2.8 0.8 L-7 -2.2 L-1.8 -2.2 Z" fill="#f4c531" stroke="#d8a200" stroke-width=".6"/>
+      <text x="0" y="2.2" font-size="5.5" font-weight="800" fill="#8a5a00" text-anchor="middle" font-family="Arial">$</text>
+    </g>
+  </svg>`;
+}
+
+function iconFor(d) {
+  if (d.kind === 'sundae')   return sundaeIcon();
+  if (d.kind === 'discount') return discountIcon();
+  return plateIcon(d.color || '#999', d.sushi || 'salmon');
+}
+
+const money = n =>
+  (n < 0 ? '-$' : '$') +
+  Math.abs(n).toLocaleString(undefined, {
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    maximumFractionDigits: 2
+  });
+
+/* ── data helpers ── */
+function allDishes()  { return [...settings.standard, ...settings.seasonal]; }
+function dishById(id) { return allDishes().find(d => d.id === id); }
+function personTotal(p) {
+  let t = 0;
+  for (const id in p.counts) { const d = dishById(id); if (d) t += d.price * p.counts[id]; }
+  return t;
+}
+
+/* ── consolidated math ── */
+function computeBillBreakdown() {
+  const svcRate = settings.serviceCharge ? SERVICE_RATE : 0;
+  const rawTotals = tally.people.map(personTotal);
+  const grandRaw  = rawTotals.reduce((a, b) => a + b, 0);
+
+  let discAmt = 0;
+  if (settings.discount.enabled && settings.discount.amount > 0) {
+    discAmt = settings.discount.type === 'pct'
+      ? grandRaw * (settings.discount.amount / 100)
+      : Math.min(settings.discount.amount, grandRaw);
+  }
+
+  const personDiscs = rawTotals.map(sub =>
+    grandRaw > 0 ? Math.round((sub / grandRaw) * discAmt * 100) / 100 : 0
+  );
+  if (discAmt > 0 && grandRaw > 0) {
+    const discUsed = personDiscs.reduce((a, b) => a + b, 0);
+    personDiscs[personDiscs.length - 1] =
+      Math.round((personDiscs[personDiscs.length - 1] + discAmt - discUsed) * 100) / 100;
+  }
+
+  let grandFinal = 0;
+  let grandPlates = 0;
+  
+  const details = tally.people.map((p, idx) => {
+    const sub        = rawTotals[idx];
+    const fee        = svcRate > 0 ? Math.round(sub * svcRate * 100) / 100 : 0;
+    const personDisc = personDiscs[idx];
+    let total        = sub + fee - personDisc;
+    
+    if (settings.rounding) total = Math.round(total);
+    grandFinal += total;
+
+    let personPlates = 0;
+    for (const id in p.counts) { personPlates += p.counts[id]; }
+    grandPlates += personPlates;
+
+    return {
+      name: p.name,
+      sub, fee, disc: personDisc, total, plates: personPlates
+    };
+  });
+
+  return { details, grandRaw, grandFinal, grandPlates, svcRate, discAmt };
+}
+
+/* ── render tally ── */
+function renderPeopleCount() {
+  document.getElementById('peopleNum').textContent  = tally.people.length;
+  document.getElementById('peopleMinus').disabled   = tally.people.length <= 1;
+  const plusBtn = document.getElementById('peoplePlus');
+  plusBtn.disabled = tally.people.length >= MAX_PEOPLE;
+  plusBtn.title    = tally.people.length >= MAX_PEOPLE ? i18n[currentLang].maxPeopleMsg : '';
+}
+
+function setPeople(delta) {
+  const n = tally.people.length + delta;
+  if (n < 1 || n > MAX_PEOPLE) return;
+  if (delta < 0) {
+    const last = tally.people[tally.people.length - 1];
+    if (Object.keys(last.counts).length > 0) {
+      const name = last.name || (i18n[currentLang].personDefault + tally.people.length);
+      if (!confirm(i18n[currentLang].confirmRemovePerson.replace('{name}', name))) return;
+    }
+  }
+  if (delta > 0) for (let i = 0; i < delta; i++) tally.people.push({name:'', counts:{}});
+  else tally.people = tally.people.slice(0, n);
+  saveTally(); renderTally();
+}
+
+function changeDishCount(pIndex, d, delta) {
+  const applyAllToggle = document.getElementById('applyAllToggle');
+  const applyAll = applyAllToggle.checked;
+
+  // "All in" is ADD-only. A remove (delta < 0) always affects just the clicked box.
+  if (applyAll && delta > 0) {
+    tally.people.forEach((person, i) => {
+      let newVal = (person.counts[d.id] || 0) + delta;
+      person.counts[d.id] = Math.max(0, newVal);
+      if (!person.counts[d.id]) delete person.counts[d.id];
+      if (window.dishRefreshers[`${i}-${d.id}`]) window.dishRefreshers[`${i}-${d.id}`]();
+    });
+
+    // Switch off automatically (one-use only logic)
+    applyAllToggle.checked = false;
+    toast(i18n[currentLang].toastAddAllAndOff);
+
+  } else {
+    // Single-box add/remove. If "All in" is armed and this is a remove,
+    // affect ONLY the clicked box and CONSUME the toggle (disarm), so a
+    // later stray tap can't accidentally fire a round for everyone.
+    if (applyAll && delta < 0) {
+      applyAllToggle.checked = false;
+      toast(i18n[currentLang].toastRemoveOne);
+    }
+
+    let person = tally.people[pIndex];
+    let newVal = (person.counts[d.id] || 0) + delta;
+    person.counts[d.id] = Math.max(0, newVal);
+    if (!person.counts[d.id]) delete person.counts[d.id];
+    if (window.dishRefreshers[`${pIndex}-${d.id}`]) window.dishRefreshers[`${pIndex}-${d.id}`]();
+  }
+
+  recalc();
+  saveTally();
+}
+
+function updateStickyNavTop() {
+  const hdr = document.querySelector('.sticky-tabs');
+  const wrap = document.getElementById('stickyNavWrapper');
+  // Slide it 14px UNDER the top header when sticking, neatly clipping the top peaks of the grass
+  if(hdr && wrap) wrap.style.top = (hdr.offsetHeight - 14) + 'px';
+}
+window.addEventListener('resize', updateStickyNavTop);
+
+function renderStickyNav(bd) {
+  const nav = document.getElementById('stickyNav');
+  const wrap = document.getElementById('stickyNavWrapper');
+  const t = i18n[currentLang];
+  
+  nav.innerHTML = '';
+  wrap.style.display = tally.people.length > 0 ? 'flex' : 'none';
+  updateStickyNavTop();
+
+  bd.details.forEach((d, idx) => {
+    const tile = document.createElement('div');
+    tile.className = 'nav-tile';
+    tile.onclick = () => {
+      const card = document.getElementById('person-card-' + idx);
+      if (card) {
+        const hdrHeight = document.querySelector('.sticky-tabs').offsetHeight;
+        // Correct the scroll destination to account for the 14px overlap
+        const offset = hdrHeight + wrap.offsetHeight - 14 + 10;
+        const y = card.getBoundingClientRect().top + window.scrollY - offset;
+        window.scrollTo({top: y, behavior: 'smooth'});
+      }
+    };
+
+    const nm = document.createElement('div');
+    nm.className = 'n';
+    nm.textContent = d.name || (t.personDefault + (idx + 1));
+
+    const dat = document.createElement('div');
+    dat.className = 'd';
+    dat.innerHTML = `<span>${d.plates}${t.plates}</span> <b>${money(d.total)}</b>`;
+
+    tile.append(nm, dat);
+    nav.appendChild(tile);
+  });
+}
+
+function renderTally() {
+  renderPeopleCount();
+  window.dishRefreshers = {}; // reset DOM hooks
+  
+  const cont = document.getElementById('peopleContainer'); cont.innerHTML = '';
+  const dishes = allDishes();
+  tally.people.forEach((p, idx) => {
+    const card = document.createElement('div'); 
+    card.className = 'card';
+    card.id = 'person-card-' + idx;
+    
+    const head = document.createElement('div'); head.className = 'person-head';
+
+    const av = document.createElement('div'); av.className = 'person-avatar'; av.textContent = idx + 1;
+
+    const inp = document.createElement('input');
+    inp.placeholder = i18n[currentLang].personDefault + (idx + 1);
+    inp.value   = p.name;
+    inp.onfocus = () => inp.select();
+    inp.oninput = () => { p.name = inp.value; saveTally(); renderStickyNav(computeBillBreakdown()); };
+
+    const tot = document.createElement('div'); tot.className = 'ptotal'; tot.id = 'ptot' + idx;
+    head.append(av, inp, tot); card.appendChild(head);
+
+    const grid = document.createElement('div'); grid.className = 'dishgrid';
+    dishes.forEach(d => {
+      const cell = document.createElement('div'); cell.className = 'dish';
+      const ic   = document.createElement('div'); ic.className = 'ic';
+      const badge = document.createElement('span'); badge.className = 'qty-badge'; badge.style.display = 'none';
+      if (d.seasonal) ic.innerHTML = `<span class="seasonal-badge">${i18n[currentLang].seasonalBadge}</span>`;
+      else            ic.innerHTML = iconFor(d);
+      ic.appendChild(badge);
+
+      const nm = document.createElement('div'); nm.className = 'nm';
+      nm.innerHTML = `<div class="t">${escapeHtml(getDishName(d))}</div><div class="p">${money(d.price)}</div>`;
+
+      const stp   = document.createElement('div'); stp.className = 'stepper';
+      const minus = document.createElement('button'); minus.textContent = '–';
+      const qty   = document.createElement('span');  qty.className = 'qty';
+      const plus  = document.createElement('button'); plus.textContent = '+';
+
+      const refresh = () => {
+        const q = p.counts[d.id] || 0;
+        qty.textContent = q; qty.className = 'qty' + (q ? ' has' : '');
+        cell.classList.toggle('active', !!q);
+        badge.textContent = q; badge.style.display = q ? 'flex' : 'none';
+      };
+      
+      // Wire up decoupled actions & registry
+      window.dishRefreshers[`${idx}-${d.id}`] = refresh;
+      minus.onclick = (e) => { e.stopPropagation(); changeDishCount(idx, d, -1); };
+      plus.onclick  = (e) => { e.stopPropagation(); changeDishCount(idx, d, 1); };
+      cell.onclick  = (e) => { if(e.target.tagName === 'BUTTON') return; changeDishCount(idx, d, 1); };
+
+      refresh();
+
+      stp.append(minus, qty, plus);
+      cell.append(ic, nm, stp);
+      grid.appendChild(cell);
+    });
+    card.appendChild(grid); cont.appendChild(card);
+  });
+  recalc();
+}
+
+function recalc() {
+  const t = i18n[currentLang];
+  const bd = computeBillBreakdown();
+
+  bd.details.forEach((d, idx) => {
+    const el = document.getElementById('ptot' + idx);
+    if (el) {
+      let html = money(d.sub);
+      if (d.fee > 0)  html += ` + <b>${money(d.fee)}</b> ${t.svc}`;
+      if (d.disc > 0) html += ` − <b class="disc-val">${money(d.disc)}</b> ${t.disc}`;
+      el.innerHTML = `<span class="calc">${html} (${d.plates}${t.plates})</span><span class="big">${money(d.total)}</span>`;
+    }
+  });
+
+  document.getElementById('grandTotal').textContent = money(Math.round(bd.grandFinal * 100) / 100);
+  const unit  = tally.people.length > 1 ? t.unitPeople : t.unitPerson;
+  const notes = [];
+  if (settings.serviceCharge) notes.push(t.noteSvc);
+  if (settings.discount.enabled && settings.discount.amount > 0) notes.push(t.noteDisc);
+  const noteStr = notes.length ? t.inclOpen + notes.join(t.inclSep) + t.inclClose : '';
+
+  document.getElementById('grandSub').textContent = `${t.totalBillBase}${noteStr} · ${t.countPrefix}${tally.people.length}${unit} · ${t.totalPlates}: ${bd.grandPlates}${t.plates}`;
+  
+  renderStickyNav(bd);
+}
+
+/* ── render settings ── */
+function renderSettings() {
+  document.getElementById('svcToggle').checked      = settings.serviceCharge;
+  document.getElementById('roundToggle').checked    = settings.rounding;
+  document.getElementById('discountToggle').checked = settings.discount.enabled;
+  document.getElementById('discTypePct').checked    = settings.discount.type === 'pct';
+  document.getElementById('discTypeFixed').checked  = settings.discount.type === 'fixed';
+  document.getElementById('discountAmount').value   = settings.discount.amount || '';
+  document.getElementById('discAmtUnit').textContent= settings.discount.type === 'pct' ? '%' : '$';
+  document.getElementById('discountFields').classList.toggle('open', settings.discount.enabled);
+
+  const sl = document.getElementById('standardList'); sl.innerHTML = '';
+  settings.standard.forEach(d => {
+    const row = document.createElement('div'); row.className = 'srow';
+    const ic  = document.createElement('div'); ic.className = 'ic'; ic.style.flex = '0 0 38px'; ic.innerHTML = iconFor(d);
+    const nm  = document.createElement('div'); nm.className = 'nm';
+    nm.innerHTML = `<div style="font-weight:700">${escapeHtml(getDishName(d))}</div>
+      ${d.kind==='discount' ? `<div class="muted" style="font-size:12px; margin-top:2px;">${money(d.price)} ${i18n[currentLang].dealSuffix}</div>` : ''}`;
+    const pw  = document.createElement('div'); pw.className = 'pricewrap';
+    const sym = document.createElement('span'); sym.textContent = '$';
+    const inp = document.createElement('input'); inp.className = 'price'; inp.type = 'number'; inp.step = '0.5'; inp.value = d.price;
+
+    inp.onfocus = () => inp.select();
+    inp.onchange = () => {
+      const v = parseFloat(inp.value);
+      d.price = (isNaN(v) || v < 0) ? 0 : v;
+      saveSettings(); renderTally();
+      if (d.kind === 'discount') renderSettings();
+      toast(i18n[currentLang].msgPriceUpdated);
+    };
+    pw.append(sym, inp); row.append(ic, nm, pw); sl.appendChild(row);
+  });
+
+  const list = document.getElementById('seasonalList'); list.innerHTML = '';
+  if (!settings.seasonal.length)
+    list.innerHTML = `<p class="muted" style="margin:6px 2px">${i18n[currentLang].noSeasonal}</p>`;
+  settings.seasonal.forEach(d => {
+    const row = document.createElement('div'); row.className = 'seas';
+    const nm  = document.createElement('input'); nm.className = 'text'; nm.value = d.name; nm.style.flex = '1';
+    nm.onchange = () => { d.name = nm.value || i18n[currentLang].seasonalDefaultName; saveSettings(); renderTally(); };
+    const pw  = document.createElement('div'); pw.className = 'pricewrap';
+    const sym = document.createElement('span'); sym.textContent = '$';
+    const pr  = document.createElement('input'); pr.className = 'price'; pr.type = 'number'; pr.step = '0.5'; pr.value = d.price;
+
+    pr.onfocus = () => pr.select();
+    pr.onchange = () => { const v = parseFloat(pr.value); d.price = (isNaN(v)||v<0)?0:v; saveSettings(); renderTally(); };
+    pw.append(sym, pr);
+    const del = document.createElement('button'); del.className = 'del'; del.innerHTML = '&times;'; del.title = i18n[currentLang].delTitle;
+    del.onclick = () => {
+      settings.seasonal = settings.seasonal.filter(x => x.id !== d.id);
+      tally.people.forEach(p => delete p.counts[d.id]);
+      saveSettings(); saveTally(); renderSettings(); renderTally();
+    };
+    row.append(nm, pw, del); list.appendChild(row);
+  });
+}
+
+/* ── copy summary ── */
+function copyBillSummary() {
+  const t = i18n[currentLang];
+  const bd = computeBillBreakdown();
+  const n = tally.people.length;
+  const lines = [
+    currentLang === 'zh'
+      ? `🍣 迴轉壽司帳單 — ${n}${t.unitPeople}`
+      : `🍣 Kaiten Sushi Bill — ${n}${n > 1 ? t.unitPeople : t.unitPerson}`,
+    '─'.repeat(30)
+  ];
+
+  bd.details.forEach((d, idx) => {
+    const name  = d.name || (t.personDefault + (idx + 1));
+    const parts = [money(d.sub)];
+    if (d.fee  > 0) parts.push(`+ ${money(d.fee)} ${t.svc}`);
+    if (d.disc > 0) parts.push(`− ${money(d.disc)} ${t.disc}`);
+
+    parts.push(`= ${money(d.total)} (${d.plates}${t.plates})`);
+    lines.push(`${name}: ${parts.join(' ')}`);
+  });
+  
+  lines.push('─'.repeat(30));
+  lines.push(`${t.totalPlates}: ${bd.grandPlates}${t.plates}`);
+  lines.push(`${currentLang === 'zh' ? '總計' : 'Total'}: ${money(Math.round(bd.grandFinal * 100) / 100)}`);
+  
+  const text = lines.join('\n');
+  navigator.clipboard.writeText(text).then(() => toast(t.copiedToast)).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); toast(t.copiedToast);
+  });
+}
+
+/* ── actions ── */
+function addSeasonal() {
+  const t     = i18n[currentLang];
+  const name  = document.getElementById('seasName').value.trim();
+  const price = parseFloat(document.getElementById('seasPrice').value);
+  if (!name)              { toast(t.msgEnterName);  return; }
+  if (isNaN(price)||price<0) { toast(t.msgEnterPrice); return; }
+  settings.seasonal.push({id:'seas_'+Date.now(), name, price, seasonal:true});
+  document.getElementById('seasName').value  = '';
+  document.getElementById('seasPrice').value = '';
+  saveSettings(); renderSettings(); renderTally();
+  toast(t.msgAdded.replace('{name}', escapeHtml(name)));
+}
+function newBill() {
+  if (!confirm(i18n[currentLang].confirmNewBill)) return;
+  tally.people.forEach(p => p.counts = {});
+  saveTally(); renderTally(); toast(i18n[currentLang].msgNewBillStarted);
+}
+function resetPrices() {
+  if (!confirm(i18n[currentLang].confirmResetPrices)) return;
+  settings.standard = structuredClone(DEFAULT_STANDARD);
+  saveSettings(); renderSettings(); renderTally(); toast(i18n[currentLang].msgPricesReset);
+}
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1900);
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ── event wiring ── */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.tab,.panel').forEach(x => x.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab).classList.add('active');
+    document.getElementById('grandBar').style.display = tab.dataset.tab === 'tally' ? 'flex' : 'none';
+  };
+});
+
+document.getElementById('peopleMinus').onclick = () => setPeople(-1);
+document.getElementById('peoplePlus').onclick  = () => setPeople(1);
+
+document.getElementById('applyAllToggle').onchange = (e) => {
+  toast(e.target.checked ? i18n[currentLang].toastToggleOn : i18n[currentLang].toastToggleOff);
+};
+
+document.getElementById('svcToggle').onchange = e => {
+  settings.serviceCharge = e.target.checked; saveSettings(); recalc();
+};
+document.getElementById('roundToggle').onchange = e => {
+  settings.rounding = e.target.checked; saveSettings(); recalc();
+};
+document.getElementById('discountToggle').onchange = e => {
+  settings.discount.enabled = e.target.checked;
+  document.getElementById('discountFields').classList.toggle('open', e.target.checked);
+  saveSettings(); recalc();
+};
+document.querySelectorAll('input[name=discType]').forEach(r => {
+  r.onchange = () => {
+    settings.discount.type   = r.value;
+    settings.discount.amount = 0;
+    document.getElementById('discountAmount').value    = '';
+    document.getElementById('discAmtUnit').textContent = r.value === 'pct' ? '%' : '$';
+    saveSettings(); recalc();
+  };
+});
+
+document.getElementById('discountAmount').onfocus = e => e.target.select();
+document.getElementById('discountAmount').onchange = e => {
+  let v = parseFloat(e.target.value);
+  if (isNaN(v) || v < 0) v = 0;
+  if (settings.discount.type === 'pct' && v > 100) v = 100;
+  settings.discount.amount = v; e.target.value = v || '';
+  saveSettings(); recalc();
+};
+
+document.getElementById('addSeas').onclick     = addSeasonal;
+document.getElementById('seasName').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('seasPrice').focus(); });
+document.getElementById('seasPrice').addEventListener('keydown', e => { if (e.key==='Enter') addSeasonal(); });
+document.getElementById('newBill').onclick     = newBill;
+document.getElementById('copyBill').onclick    = copyBillSummary;
+document.getElementById('resetPrices').onclick = resetPrices;
+document.getElementById('langToggleBtn').onclick = () => setLanguage(currentLang === 'en' ? 'zh' : 'en');
+
+/* ── init ── */
+updateStaticLabels();
+renderSettings();
+renderTally();
+</script>
+</body>
+</html>

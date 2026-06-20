@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Full-bleed background — fills the maskable safe zone on all OSes -->
+  <rect width="512" height="512" fill="#D84A46"/>
+
+  <!-- Subtle seigaiha hint in corners -->
+  <circle cx="0"   cy="0"   r="60" fill="none" stroke="#E86A66" stroke-width="2" opacity="0.4"/>
+  <circle cx="512" cy="0"   r="60" fill="none" stroke="#E86A66" stroke-width="2" opacity="0.4"/>
+  <circle cx="0"   cy="512" r="60" fill="none" stroke="#E86A66" stroke-width="2" opacity="0.4"/>
+  <circle cx="512" cy="512" r="60" fill="none" stroke="#E86A66" stroke-width="2" opacity="0.4"/>
+
+  <!-- Plate shadow -->
+  <ellipse cx="256" cy="352" rx="188" ry="74" fill="#B83836"/>
+  <!-- Plate body -->
+  <ellipse cx="256" cy="334" rx="188" ry="74" fill="#EFBDBB"/>
+  <!-- Plate top face -->
+  <ellipse cx="256" cy="320" rx="188" ry="74" fill="#FAE0DF"/>
+  <!-- Inner rim groove -->
+  <ellipse cx="256" cy="308" rx="132" ry="52" fill="#D84A46" opacity="0.22"/>
+  <!-- Rice pad -->
+  <ellipse cx="256" cy="296" rx="98" ry="39" fill="#FFF8F0"/>
+
+  <!-- Salmon nigiri topping -->
+  <path d="M172 288 q42 -80 168 0 q-42 24 -168 0z" fill="#f28060"/>
+  <!-- Salmon highlight streak -->
+  <path d="M202 254 q56 -48 124 -8" stroke="#ffffff" stroke-width="12" stroke-linecap="round" fill="none" opacity="0.32"/>
+  <!-- Salmon shadow line -->
+  <path d="M175 286 q80 -14 162 0" stroke="#c05838" stroke-width="5" fill="none" opacity="0.38"/>
+</svg>
