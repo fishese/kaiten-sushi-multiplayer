@@ -364,11 +364,13 @@
 
 <div id="connectionBanner" class="connection-banner" style="display:none;">
   <span id="connectionBannerText"></span>
+  <button id="bannerGoOfflineBtn" style="margin-left:8px; background:none; border:none; text-decoration:underline; font-weight:700; cursor:pointer; color:inherit; font-size:inherit;"></button>
 </div>
 
 <div class="header-top">
   <h1 id="lblHeaderTitle">🍣 數碟郎 — 迴轉壽司分帳機</h1>
   <div id="roomBadge" class="room-badge" style="display:none;"></div>
+  <button id="goOfflineLink" style="display:none; background:none; border:none; color:rgba(255,255,255,0.85); font-size:11px; text-decoration:underline; cursor:pointer; padding:2px 0; margin-top:2px;"></button>
 </div>
 
 <div class="sticky-tabs">
@@ -594,7 +596,10 @@ const i18n = {
     confirmDeleteHistory:'Delete this saved bill?',
     confirmFinishClose:"Finish and close this bill for everyone? This can't be undone.",
     confirmSaveHistory:'Save a copy of the final split to this phone?',
-    billClosedMsg:'Bill closed.', finishCloseBtn:'Finish & Close'
+    billClosedMsg:'Bill closed.', finishCloseBtn:'Finish & Close',
+    confirmForkOffline:"Switch to an offline copy? You'll keep everything tallied so far on this phone, but you'll stop syncing with the room, and there's no automatic way back in.",
+    forkedOfflineMsg:'Switched to an offline copy',
+    offlineCopyLabel:'OFFLINE COPY', goOfflineLinkLabel:'Go offline instead'
   },
   zh: {
     title:'壽司分帳機', headerTitle:'🍣 數碟郎 — 迴轉壽司分帳機',
@@ -650,7 +655,10 @@ const i18n = {
     confirmDeleteHistory:'確定要刪除呢張已儲存嘅帳單嗎？',
     confirmFinishClose:'確定要為全部人結束呢張帳單嗎？呢個動作冚唪唥都唔可以還原。',
     confirmSaveHistory:'想將呢張結算結果儲存喺呢部手機嗎？',
-    billClosedMsg:'帳單已結束。', finishCloseBtn:'結束帳單'
+    billClosedMsg:'帳單已結束。', finishCloseBtn:'結束帳單',
+    confirmForkOffline:'確定要轉做離線副本嗎？你呢部手機而家嘅紀錄會保留，但之後唔會再同房間同步，亦冇得自動加返入去。',
+    forkedOfflineMsg:'已轉做離線副本',
+    offlineCopyLabel:'離線副本', goOfflineLinkLabel:'轉做離線模式'
   }
 };
 
@@ -677,6 +685,7 @@ function updateConnectionUI() {
     banner.style.display = 'none';
   } else {
     document.getElementById('connectionBannerText').textContent = i18n[currentLang].connectionLost;
+    document.getElementById('bannerGoOfflineBtn').textContent  = i18n[currentLang].goOfflineLinkLabel;
     banner.style.display = 'block';
   }
 }
@@ -779,6 +788,13 @@ function getDishName(d) {
 function setLanguage(lang) {
   currentLang = lang; localStorage.setItem(LS_LANG, lang);
   updateStaticLabels(); renderTally(); renderSettings();
+  if (isOnline) {
+    const room = getRoom();
+    if (room) showRoomBadge(room.room_code);
+    updateConnectionUI();
+  } else {
+    showForkBadge();
+  }
 }
 
 /* ── SVG icons ── */
@@ -1348,6 +1364,45 @@ function showRoomBadge(roomCode) {
   const badge = document.getElementById('roomBadge');
   badge.textContent = '🔗 ' + roomCode;
   badge.style.display = 'inline-flex';
+  const link = document.getElementById('goOfflineLink');
+  link.textContent = i18n[currentLang].goOfflineLinkLabel;
+  link.style.display = 'block';
+}
+
+// "Fork" (plan §IV.1, option 2): freeze the current room state into a
+// standalone local copy. Deliberately one-way -- no automatic path back in,
+// matching the plan exactly. Fully local: no server call needed at all.
+function goOfflineFork() {
+  const t = i18n[currentLang];
+  if (!confirm(t.confirmForkOffline)) return;
+  const room = getRoom();
+
+  isOnline = false; // flips saveSettings()/saveTally() back on, see below
+  if (roomChannel) { supabaseClient.removeChannel(roomChannel); roomChannel = null; }
+  localStorage.removeItem('kaiten_room_v1');
+  localStorage.setItem('kaiten_fork_label_v1', JSON.stringify({
+    roomCode: room ? room.room_code : null,
+    forkedAt: new Date().toISOString()
+  }));
+
+  saveSettings(); // writes the room's current settings/tally into the
+  saveTally();    // OFFLINE localStorage keys, now that isOnline is false
+
+  document.getElementById('goOfflineLink').style.display = 'none';
+  updateConnectionUI();
+  showForkBadge();
+  renderSettings();
+  renderTally();
+  toast(t.forkedOfflineMsg);
+}
+
+function showForkBadge() {
+  let fork;
+  try { fork = JSON.parse(localStorage.getItem('kaiten_fork_label_v1')); } catch(e) {}
+  const badge = document.getElementById('roomBadge');
+  if (isOnline || !fork) { badge.style.display = 'none'; return; }
+  badge.textContent = '📋 ' + i18n[currentLang].offlineCopyLabel + (fork.roomCode ? ' · ' + fork.roomCode : '');
+  badge.style.display = 'inline-flex';
 }
 function hideLobby() {
   document.getElementById('lobbyOverlay').classList.add('hidden');
@@ -1791,11 +1846,14 @@ document.getElementById('lobbyStartBtn').onclick   = startNewBill;
 document.getElementById('lobbyJoinBtn').onclick    = joinRoomByCode;
 document.getElementById('lobbyOfflineBtn').onclick = useOffline;
 document.getElementById('lobbyCodeInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoomByCode(); });
+document.getElementById('goOfflineLink').onclick     = goOfflineFork;
+document.getElementById('bannerGoOfflineBtn').onclick = goOfflineFork;
 
 /* ── init ── */
 updateStaticLabels();
 renderSettings();
 renderTally();
+showForkBadge(); // shows the "OFFLINE COPY" badge if this device previously forked out of a room
 </script>
 </body>
 </html>
