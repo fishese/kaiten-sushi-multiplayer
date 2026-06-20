@@ -1285,6 +1285,7 @@ function renderSettings() {
       saveSettings(); renderTally();
       if (d.kind === 'discount') renderSettings();
       toast(i18n[currentLang].msgPriceUpdated);
+      syncMenuItem(d.id, { p_price: d.price });
     };
     pw.append(sym, inp); row.append(ic, nm, pw); sl.appendChild(row);
   });
@@ -1295,16 +1296,34 @@ function renderSettings() {
   settings.seasonal.forEach(d => {
     const row = document.createElement('div'); row.className = 'seas';
     const nm  = document.createElement('input'); nm.className = 'text'; nm.value = d.name; nm.style.flex = '1';
-    nm.onchange = () => { d.name = nm.value || i18n[currentLang].seasonalDefaultName; saveSettings(); renderTally(); };
+    nm.onchange = () => {
+      d.name = nm.value || i18n[currentLang].seasonalDefaultName;
+      saveSettings(); renderTally();
+      syncMenuItem(d.id, { p_name: d.name });
+    };
     const pw  = document.createElement('div'); pw.className = 'pricewrap';
     const sym = document.createElement('span'); sym.textContent = '$';
     const pr  = document.createElement('input'); pr.className = 'price'; pr.type = 'number'; pr.step = '0.5'; pr.value = d.price;
 
     pr.onfocus = () => pr.select();
-    pr.onchange = () => { const v = parseFloat(pr.value); d.price = (isNaN(v)||v<0)?0:v; saveSettings(); renderTally(); };
+    pr.onchange = () => {
+      const v = parseFloat(pr.value); d.price = (isNaN(v)||v<0)?0:v;
+      saveSettings(); renderTally();
+      syncMenuItem(d.id, { p_price: d.price });
+    };
     pw.append(sym, pr);
     const del = document.createElement('button'); del.className = 'del'; del.innerHTML = '&times;'; del.title = i18n[currentLang].delTitle;
-    del.onclick = () => {
+    del.onclick = async () => {
+      // online: archive (is_active=false) rather than hard-delete -- a real delete
+      // would cascade-erase everyone's tap history for this dish via the FK
+      if (isOnline) {
+        const room = getRoom();
+        const itemId = menuItemIdByDishKey[d.id];
+        if (room && itemId) {
+          const { error } = await supabaseClient.rpc('update_menu_item', { p_bill: room.bill_id, p_item: itemId, p_is_active: false });
+          if (error) { console.error('archive menu item failed:', error); toast(i18n[currentLang].onlineSaveFailed); return; }
+        }
+      }
       settings.seasonal = settings.seasonal.filter(x => x.id !== d.id);
       tally.people.forEach(p => delete p.counts[d.id]);
       saveSettings(); saveTally(); renderSettings(); renderTally();
@@ -1359,6 +1378,35 @@ function getDeviceId() {
 }
 function saveRoom(room) { localStorage.setItem('kaiten_room_v1', JSON.stringify(room)); }
 function getRoom() { try { return JSON.parse(localStorage.getItem('kaiten_room_v1')); } catch(e) { return null; } }
+
+// Push a partial settings change to the server. No-op offline. The realtime
+// echo (applyRemoteBillSettings) is naturally idempotent -- we've already
+// set the same value locally, so it's just a harmless redundant compare.
+function syncSettings(partial) {
+  if (!isOnline) return;
+  const room = getRoom();
+  if (!room) return;
+  const params = { p_bill: room.bill_id };
+  if ('serviceCharge'    in partial) params.p_service_charge   = partial.serviceCharge;
+  if ('rounding'         in partial) params.p_rounding         = partial.rounding;
+  if ('discountEnabled'  in partial) params.p_discount_enabled = partial.discountEnabled;
+  if ('discountType'     in partial) params.p_discount_type    = partial.discountType;
+  if ('discountAmount'   in partial) params.p_discount_amount  = partial.discountAmount;
+  supabaseClient.rpc('update_settings', params).then(({ error }) => {
+    if (error) { console.error('update_settings failed:', error); toast(i18n[currentLang].onlineSaveFailed); }
+  });
+}
+
+// Push a single menu item's edited field(s) to the server. No-op offline.
+function syncMenuItem(dishKey, fields) {
+  if (!isOnline) return;
+  const room = getRoom();
+  const itemId = menuItemIdByDishKey[dishKey];
+  if (!room || !itemId) return;
+  supabaseClient.rpc('update_menu_item', { p_bill: room.bill_id, p_item: itemId, ...fields }).then(({ error }) => {
+    if (error) { console.error('update_menu_item failed:', error); toast(i18n[currentLang].onlineSaveFailed); }
+  });
+}
 
 function showRoomBadge(roomCode) {
   const badge = document.getElementById('roomBadge');
@@ -1567,8 +1615,15 @@ function subscribeToRoom(billId) {
         payload => applyRemoteDinerRename(payload.new))
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'diners', filter: `bill_id=eq.${billId}` },
         payload => applyRemoteDinerRemoval(payload.old))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'menu_items', filter: `bill_id=eq.${billId}` },
+        payload => applyRemoteMenuItemUpsert(payload.new))
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'menu_items', filter: `bill_id=eq.${billId}` },
+        payload => applyRemoteMenuItemUpsert(payload.new))
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bills', filter: `id=eq.${billId}` },
-        payload => { if (payload.new.status === 'closed') handleBillClosed(); })
+        payload => {
+          if (payload.new.status === 'closed') { handleBillClosed(); return; }
+          applyRemoteBillSettings(payload.new);
+        })
     .subscribe((status) => {
       const wasConnected = channelConnected;
       channelConnected = (status === 'SUBSCRIBED');
@@ -1632,6 +1687,53 @@ function applyRemoteDinerRemoval(diner) {
   tally.people.splice(idx, 1);
   if (tally.people.length === 0) tally.people.push({ id: null, name: '', counts: {} });
   renderTally();
+}
+
+// A menu item was added, edited, or archived -- by us (harmless redundant
+// rebuild with identical data) or someone else. Always rebuild that one
+// dish's local entry from the authoritative server row rather than patching
+// fields in place, so add/edit/archive all funnel through one code path.
+function applyRemoteMenuItemUpsert(item) {
+  settings.standard = settings.standard.filter(d => d.id !== item.dish_key);
+  settings.seasonal = settings.seasonal.filter(d => d.id !== item.dish_key);
+  delete menuItemIdByDishKey[item.dish_key];
+
+  if (!item.is_active) {
+    // archived -- drop any outstanding tally too, matching the local archive behavior
+    tally.people.forEach(p => delete p.counts[item.dish_key]);
+    renderSettings();
+    renderTally();
+    return;
+  }
+
+  menuItemIdByDishKey[item.dish_key] = item.id;
+  dishKeyByMenuItemId[item.id] = item.dish_key;
+  const dish = { id: item.dish_key, name: item.name, price: Number(item.price) };
+  if (item.kind === 'seasonal') {
+    dish.seasonal = true;
+    settings.seasonal.push(dish);
+  } else {
+    const def = DEFAULT_BY_ID[item.dish_key];
+    if (def) { dish.kind = def.kind; dish.color = def.color; dish.sushi = def.sushi; }
+    settings.standard.push(dish);
+  }
+  renderSettings();
+  renderTally();
+}
+
+// Service charge / rounding / discount changed -- by us (echo, naturally a
+// no-op since we already match) or someone else.
+function applyRemoteBillSettings(bill) {
+  let changed = false;
+  if (settings.serviceCharge !== !!bill.service_charge) { settings.serviceCharge = !!bill.service_charge; changed = true; }
+  if (settings.rounding      !== !!bill.rounding)       { settings.rounding      = !!bill.rounding;       changed = true; }
+  const newDiscount = {
+    enabled: !!bill.discount_enabled,
+    type:    bill.discount_type || 'pct',
+    amount:  Number(bill.discount_amount || 0)
+  };
+  if (JSON.stringify(settings.discount) !== JSON.stringify(newDiscount)) { settings.discount = newDiscount; changed = true; }
+  if (changed) { renderSettings(); recalc(); }
 }
 
 // "Finish & Close" -- just asks the server to close the bill. The actual
@@ -1753,13 +1855,26 @@ function renderHistory() {
 }
 
 /* ── actions ── */
-function addSeasonal() {
+async function addSeasonal() {
   const t     = i18n[currentLang];
   const name  = document.getElementById('seasName').value.trim();
   const price = parseFloat(document.getElementById('seasPrice').value);
   if (!name)              { toast(t.msgEnterName);  return; }
   if (isNaN(price)||price<0) { toast(t.msgEnterPrice); return; }
-  settings.seasonal.push({id:'seas_'+Date.now(), name, price, seasonal:true});
+
+  const dishKey = 'seas_' + Date.now();
+  if (isOnline) {
+    const room = getRoom();
+    if (!room) return;
+    const { data: itemId, error } = await supabaseClient.rpc('add_menu_item', {
+      p_bill: room.bill_id, p_dish_key: dishKey, p_name: name, p_price: price, p_kind: 'seasonal'
+    });
+    if (error || !itemId) { console.error('add_menu_item failed:', error); toast(t.onlineSaveFailed); return; }
+    menuItemIdByDishKey[dishKey] = itemId;
+    dishKeyByMenuItemId[itemId] = dishKey;
+  }
+
+  settings.seasonal.push({ id: dishKey, name, price, seasonal: true });
   document.getElementById('seasName').value  = '';
   document.getElementById('seasPrice').value = '';
   saveSettings(); renderSettings(); renderTally();
@@ -1774,6 +1889,7 @@ function resetPrices() {
   if (!confirm(i18n[currentLang].confirmResetPrices)) return;
   settings.standard = structuredClone(DEFAULT_STANDARD);
   saveSettings(); renderSettings(); renderTally(); toast(i18n[currentLang].msgPricesReset);
+  if (isOnline) DEFAULT_STANDARD.forEach(d => syncMenuItem(d.id, { p_price: d.price }));
 }
 let toastTimer;
 function toast(msg) {
@@ -1807,14 +1923,17 @@ document.getElementById('applyAllToggle').onchange = (e) => {
 
 document.getElementById('svcToggle').onchange = e => {
   settings.serviceCharge = e.target.checked; saveSettings(); recalc();
+  syncSettings({ serviceCharge: settings.serviceCharge });
 };
 document.getElementById('roundToggle').onchange = e => {
   settings.rounding = e.target.checked; saveSettings(); recalc();
+  syncSettings({ rounding: settings.rounding });
 };
 document.getElementById('discountToggle').onchange = e => {
   settings.discount.enabled = e.target.checked;
   document.getElementById('discountFields').classList.toggle('open', e.target.checked);
   saveSettings(); recalc();
+  syncSettings({ discountEnabled: settings.discount.enabled });
 };
 document.querySelectorAll('input[name=discType]').forEach(r => {
   r.onchange = () => {
@@ -1823,6 +1942,7 @@ document.querySelectorAll('input[name=discType]').forEach(r => {
     document.getElementById('discountAmount').value    = '';
     document.getElementById('discAmtUnit').textContent = r.value === 'pct' ? '%' : '$';
     saveSettings(); recalc();
+    syncSettings({ discountType: settings.discount.type, discountAmount: settings.discount.amount });
   };
 });
 
@@ -1833,6 +1953,7 @@ document.getElementById('discountAmount').onchange = e => {
   if (settings.discount.type === 'pct' && v > 100) v = 100;
   settings.discount.amount = v; e.target.value = v || '';
   saveSettings(); recalc();
+  syncSettings({ discountAmount: settings.discount.amount });
 };
 
 document.getElementById('addSeas').onclick     = addSeasonal;
