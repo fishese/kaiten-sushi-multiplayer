@@ -340,6 +340,17 @@
     background:rgba(255,255,255,0.2); color:#fff; padding:4px 10px; border-radius:20px;
     margin-top:2px;
   }
+  .presence-dot{
+    width:16px; height:16px; border-radius:50%; border:none; cursor:pointer; flex-shrink:0;
+    padding:0; box-shadow:0 1px 3px rgba(0,0,0,0.15);
+  }
+  .presence-dot.present{ background:var(--accent2); }
+  .presence-dot.away{ background:#C9C2B8; }
+  .presence-dot.unclaimed{ background:var(--accent); animation:presencePulse 1.6s infinite; }
+  @keyframes presencePulse{
+    0%,100%{ box-shadow:0 0 0 0 rgba(216,74,70,0.35); }
+    50%{ box-shadow:0 0 0 5px rgba(216,74,70,0.12); }
+  }
   .connection-banner{
     background:#F5A623; color:#3A3532; text-align:center; font-weight:700; font-size:13px;
     padding:8px 12px;
@@ -370,6 +381,7 @@
 <div class="header-top">
   <h1 id="lblHeaderTitle">🍣 數碟郎 — 迴轉壽司分帳機</h1>
   <div id="roomBadge" class="room-badge" style="display:none;"></div>
+  <div id="notJoinedBadge" class="room-badge" style="display:none; background:rgba(245,166,35,0.35);"></div>
   <button id="goOfflineLink" style="display:none; background:none; border:none; color:rgba(255,255,255,0.85); font-size:11px; text-decoration:underline; cursor:pointer; padding:2px 0; margin-top:2px;"></button>
 </div>
 
@@ -599,7 +611,9 @@ const i18n = {
     billClosedMsg:'Bill closed.', finishCloseBtn:'Finish & Close',
     confirmForkOffline:"Switch to an offline copy? You'll keep everything tallied so far on this phone, but you'll stop syncing with the room, and there's no automatic way back in.",
     forkedOfflineMsg:'Switched to an offline copy',
-    offlineCopyLabel:'OFFLINE COPY', goOfflineLinkLabel:'Go offline instead'
+    offlineCopyLabel:'OFFLINE COPY', goOfflineLinkLabel:'Go offline instead',
+    presencePresentTitle:'Present', presenceAwayTitle:'Joined, currently away',
+    presenceClaimTitle:'Tap if this is you', notJoinedLabel:'not joined'
   },
   zh: {
     title:'壽司分帳機', headerTitle:'🍣 數碟郎 — 迴轉壽司分帳機',
@@ -658,7 +672,9 @@ const i18n = {
     billClosedMsg:'帳單已結束。', finishCloseBtn:'結束帳單',
     confirmForkOffline:'確定要轉做離線副本嗎？你呢部手機而家嘅紀錄會保留，但之後唔會再同房間同步，亦冇得自動加返入去。',
     forkedOfflineMsg:'已轉做離線副本',
-    offlineCopyLabel:'離線副本', goOfflineLinkLabel:'轉做離線模式'
+    offlineCopyLabel:'離線副本', goOfflineLinkLabel:'轉做離線模式',
+    presencePresentTitle:'已連線', presenceAwayTitle:'已加入，暫時離開',
+    presenceClaimTitle:'如果係你，撳呢個', notJoinedLabel:'未加入'
   }
 };
 
@@ -984,7 +1000,7 @@ function setPeople(delta) {
       supabaseClient.rpc('add_diner', { p_bill: room.bill_id, p_name: '' }).then(({ data: newId, error }) => {
         if (error || !newId) { console.error('add_diner failed:', error); toast(t.onlineSaveFailed); return; }
         if (!tally.people.some(p => p.id === newId)) { // guard against the realtime echo racing us here
-          tally.people.push({ id: newId, name: '', counts: {} });
+          tally.people.push({ id: newId, name: '', counts: {}, claimed: false });
           renderTally();
         }
       });
@@ -1157,7 +1173,8 @@ function renderStickyNav(bd) {
 
 function renderTally() {
   renderPeopleCount();
-  window.dishRefreshers = {}; // reset DOM hooks
+  window.dishRefreshers = {};   // reset DOM hooks
+  window.presenceDotRefs = {};  // reset presence-dot hooks
   
   const cont = document.getElementById('peopleContainer'); cont.innerHTML = '';
   const dishes = allDishes();
@@ -1187,7 +1204,17 @@ function renderTally() {
     }
 
     const tot = document.createElement('div'); tot.className = 'ptotal'; tot.id = 'ptot' + idx;
-    head.append(av, inp, tot); card.appendChild(head);
+
+    if (isOnline) {
+      const dot = document.createElement('button');
+      dot.className = 'presence-dot unclaimed'; // updatePresenceUI() repaints this immediately after
+      dot.onclick = (e) => { e.stopPropagation(); claimDiner(p.id); };
+      window.presenceDotRefs[idx] = dot;
+      head.append(av, dot, inp, tot);
+    } else {
+      head.append(av, inp, tot);
+    }
+    card.appendChild(head);
 
     const grid = document.createElement('div'); grid.className = 'dishgrid';
     dishes.forEach(d => {
@@ -1228,6 +1255,7 @@ function renderTally() {
     card.appendChild(grid); cont.appendChild(card);
   });
   recalc();
+  if (isOnline) updatePresenceUI();
 }
 
 function recalc() {
@@ -1488,6 +1516,7 @@ async function startNewBill() {
   showRoomBadge(data.bill.room_code);
   hideLobby();
   toast(t.lobbyRoomCreated.replace('{code}', data.bill.room_code));
+  claimDiner(data.host_diner_id); // you obviously are the diner you just created
 }
 
 async function joinRoomByCode() {
@@ -1526,6 +1555,7 @@ async function joinRoomByCode() {
   showRoomBadge(fresh.data.bill.room_code);
   hideLobby();
   toast(t.lobbyJoinedRoom.replace('{code}', fresh.data.bill.room_code));
+  claimDiner(newDinerId); // you obviously are the diner you just created
 }
 
 function useOffline() {
@@ -1590,9 +1620,9 @@ function applySnapshot(snap) {
   });
 
   tally.people = (snap.diners || []).map(d => ({
-    id: d.id, name: d.name || '', counts: countsByDiner[d.id] || {}
+    id: d.id, name: d.name || '', counts: countsByDiner[d.id] || {}, claimed: !!d.claimed_by_device
   }));
-  if (tally.people.length === 0) tally.people = [{ id: null, name: '', counts: {} }];
+  if (tally.people.length === 0) tally.people = [{ id: null, name: '', counts: {}, claimed: false }];
 
   renderSettings();
   renderTally();
@@ -1624,13 +1654,74 @@ function subscribeToRoom(billId) {
           if (payload.new.status === 'closed') { handleBillClosed(); return; }
           applyRemoteBillSettings(payload.new);
         })
+    .on('presence', { event: 'sync' }, () => updatePresenceUI())
     .subscribe((status) => {
       const wasConnected = channelConnected;
       channelConnected = (status === 'SUBSCRIBED');
       updateConnectionUI();
+      if (channelConnected && !wasConnected) {
+        // announce ourselves on the presence channel -- every connected device
+        // tracks {device_id, diner_id}, which is all "who's here" needs
+        const room = getRoom();
+        roomChannel.track({ device_id: getDeviceId(), diner_id: room ? room.diner_id : null });
+      }
       if (channelConnected && !wasConnected && !firstConnect) resyncRoom();
       if (channelConnected) firstConnect = false;
     });
+}
+
+// claim_diner: marks a tile as "this is me" (server-side) and re-points our
+// own presence track at it. Calling this on an already-claimed tile is
+// intentionally harmless (plan: "double-claims are harmless, last wins") --
+// it's how you correct a mis-claim or hand a shared device to someone else.
+async function claimDiner(dinerId) {
+  const room = getRoom();
+  if (!room) return;
+  const { error } = await supabaseClient.rpc('claim_diner', { p_bill: room.bill_id, p_diner: dinerId, p_device: getDeviceId() });
+  if (error) { console.error('claim_diner failed:', error); toast(i18n[currentLang].onlineSaveFailed); return; }
+  const person = tally.people.find(p => p.id === dinerId);
+  if (person) person.claimed = true;
+  room.diner_id = dinerId;
+  saveRoom(room);
+  renderTally();
+  if (roomChannel) roomChannel.track({ device_id: getDeviceId(), diner_id: dinerId });
+}
+
+// Derives the three presence states from the channel's tracked payloads and
+// paints the per-diner dots + the "N not joined" badge. Uses the
+// presenceDotRefs registry (populated by renderTally) rather than a full
+// re-render, since presence syncs can fire fairly often.
+function updatePresenceUI() {
+  if (!isOnline || !roomChannel) return;
+  const t = i18n[currentLang];
+  const state = roomChannel.presenceState();
+  const presentDinerIds = new Set();
+  Object.values(state).forEach(metas => metas.forEach(m => { if (m.diner_id) presentDinerIds.add(m.diner_id); }));
+
+  let notJoinedCount = 0;
+  tally.people.forEach((p, idx) => {
+    const dot = window.presenceDotRefs && window.presenceDotRefs[idx];
+    if (!dot) return;
+    if (presentDinerIds.has(p.id)) {
+      dot.className = 'presence-dot present';
+      dot.title = t.presencePresentTitle;
+    } else if (p.claimed) {
+      dot.className = 'presence-dot away';
+      dot.title = t.presenceAwayTitle;
+    } else {
+      dot.className = 'presence-dot unclaimed';
+      dot.title = t.presenceClaimTitle;
+      notJoinedCount++;
+    }
+  });
+
+  const badge = document.getElementById('notJoinedBadge');
+  if (notJoinedCount > 0) {
+    badge.textContent = '👋 ' + notJoinedCount + ' ' + t.notJoinedLabel;
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 // Called when the realtime connection comes back after being down. We didn't
@@ -1666,17 +1757,22 @@ function applyRemoteEvent(ev) {
 // Someone else just joined the room -- give them a tile without anyone reloading.
 function applyRemoteDiner(diner) {
   if (tally.people.some(p => p.id === diner.id)) return; // it's us, or already known
-  tally.people.push({ id: diner.id, name: diner.name || '', counts: {} });
+  tally.people.push({ id: diner.id, name: diner.name || '', counts: {}, claimed: !!diner.claimed_by_device });
   renderTally();
 }
 
-// Someone (possibly us, echoed back) renamed a diner -- naturally idempotent,
-// since setting the same name twice is harmless, so no dedup bookkeeping needed.
+// Someone (possibly us, echoed back) renamed a diner and/or claimed it --
+// naturally idempotent (setting the same name/claim twice is harmless), so
+// no dedup bookkeeping needed. Covers both rename_diner and claim_diner,
+// since both are plain UPDATE statements on the same diners row.
 function applyRemoteDinerRename(diner) {
   const person = tally.people.find(p => p.id === diner.id);
-  if (!person || person.name === (diner.name || '')) return;
-  person.name = diner.name || '';
-  renderTally();
+  if (!person) return;
+  let changed = false;
+  if (person.name !== (diner.name || '')) { person.name = diner.name || ''; changed = true; }
+  const claimedNow = !!diner.claimed_by_device;
+  if (person.claimed !== claimedNow) { person.claimed = claimedNow; changed = true; }
+  if (changed) renderTally();
 }
 
 // Someone (possibly us, echoed back) removed a diner -- also naturally
