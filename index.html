@@ -409,6 +409,7 @@
   <div id="roomBadge" class="room-badge" style="display:none;"></div>
   <div id="notJoinedBadge" class="room-badge" style="display:none; background:rgba(245,166,35,0.35);"></div>
   <button id="shareRoomBtn" style="display:none; background:rgba(255,255,255,0.25); border:none; color:#fff; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; cursor:pointer; margin-top:4px;"></button>
+  <button id="closeRoomBtn" style="display:none; background:rgba(255,255,255,0.25); border:none; color:#fff; font-size:11px; font-weight:700; padding:4px 10px; border-radius:20px; cursor:pointer; margin-top:4px;"></button>
   <button id="goOfflineLink" style="display:none; background:none; border:none; color:rgba(255,255,255,0.85); font-size:11px; text-decoration:underline; cursor:pointer; padding:2px 0; margin-top:2px;"></button>
 </div>
 
@@ -658,7 +659,8 @@ const i18n = {
     shareQrCaption:'Or scan to join', copyLinkBtn:'Copy link',
     nativeShareBtn:'Share...', closeBtn:'Close',
     shareInviteText:'Join my Kaiten Sushi bill: {code}',
-    pinSelfTitle:'Pin my tile to the top'
+    pinSelfTitle:'Pin my tile to the top',
+    closeRoomBtnLabel:'Close Room'
   },
   zh: {
     title:'壽司分帳機', headerTitle:'🍣 數碟郎 — 迴轉壽司分帳機',
@@ -724,7 +726,8 @@ const i18n = {
     shareQrCaption:'或者掃描加入', copyLinkBtn:'複製連結',
     nativeShareBtn:'分享...', closeBtn:'關閉',
     shareInviteText:'嚟同我一齊計數碟郎帳單：{code}',
-    pinSelfTitle:'將我嘅卡置頂'
+    pinSelfTitle:'將我嘅卡置頂',
+    closeRoomBtnLabel:'結束帳單'
   }
 };
 
@@ -803,7 +806,9 @@ function sortMenuArrays() {
 // different people could each send a different person's remainder to a
 // different place. Keeping the canonical array untouched and only
 // reordering a list of INDICES sidesteps that entirely.
-function isPinnedSelf() { return localStorage.getItem('kaiten_pin_self_v1') === 'true'; }
+// Defaults to pinned: only an explicit, previous "false" turns it off --
+// anything else (never set, or set to "true") counts as pinned.
+function isPinnedSelf() { return localStorage.getItem('kaiten_pin_self_v1') !== 'false'; }
 
 function togglePinSelf() {
   localStorage.setItem('kaiten_pin_self_v1', String(!isPinnedSelf()));
@@ -1578,6 +1583,9 @@ function showRoomBadge(roomCode) {
   const shareBtn = document.getElementById('shareRoomBtn');
   shareBtn.textContent = '📤 ' + i18n[currentLang].shareBtn;
   shareBtn.style.display = 'block';
+  const closeBtn = document.getElementById('closeRoomBtn');
+  closeBtn.textContent = '🔒 ' + i18n[currentLang].closeRoomBtnLabel;
+  closeBtn.style.display = 'block';
 }
 
 // Builds the shareable join link for the room currently in the address bar's
@@ -1631,6 +1639,7 @@ function goOfflineFork() {
 
   document.getElementById('goOfflineLink').style.display = 'none';
   document.getElementById('shareRoomBtn').style.display = 'none';
+  document.getElementById('closeRoomBtn').style.display = 'none';
   closeShareModal();
   updateConnectionUI();
   showForkBadge();
@@ -2241,6 +2250,7 @@ document.getElementById('goOfflineLink').onclick     = goOfflineFork;
 document.getElementById('bannerGoOfflineBtn').onclick = goOfflineFork;
 
 document.getElementById('shareRoomBtn').onclick   = openShareModal;
+document.getElementById('closeRoomBtn').onclick    = finishAndClose;
 document.getElementById('shareCloseBtn').onclick  = closeShareModal;
 document.getElementById('shareLinkInput').onfocus = e => e.target.select();
 document.getElementById('shareCopyBtn').onclick   = () => {
