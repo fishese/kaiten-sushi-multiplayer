@@ -361,6 +361,14 @@
   .lobby-divider{display:flex; align-items:center; gap:10px; margin:14px 0; color:var(--muted); font-size:12px}
   .lobby-divider::before, .lobby-divider::after{content:''; flex:1; border-top:1px dashed var(--line)}
   .lobby-join-row{display:flex; gap:8px}
+  .lobby-card.form-card{ text-align:left; max-height:82vh; overflow-y:auto; }
+  .panel-section{ margin-top:16px; }
+  .panel-section-title{ font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.5px; color:var(--muted); margin-bottom:6px; }
+  .chip-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; background:rgba(0,0,0,0.03); border-radius:14px; padding:7px 12px; margin-bottom:6px; font-size:13px; }
+  .chip-remove{ background:none; border:none; color:var(--muted); font-size:17px; cursor:pointer; line-height:1; padding:0 2px; flex-shrink:0; }
+  .panel-add-row{ display:flex; gap:8px; margin-bottom:10px; }
+  .panel-add-row .text{ flex:1; min-width:0; }
+  .panel-pick-btn{ width:100%; text-align:left; margin-bottom:6px; }
   .room-badge{
     display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700;
     background:rgba(255,255,255,0.2); color:#fff; padding:4px 10px; border-radius:20px;
@@ -396,6 +404,52 @@
       <button class="btn ghost" id="lobbyJoinBtn">加入</button>
     </div>
     <button class="btn ghost" id="lobbyOfflineBtn" style="width:100%; margin-top:18px;">離線使用（唔同步）</button>
+  </div>
+</div>
+
+<div id="createPanelOverlay" class="lobby-overlay hidden">
+  <div class="lobby-card form-card">
+    <h1 id="lblCreatePanelTitle" style="margin:0 0 14px; font-size:18px; text-align:center;"></h1>
+    <input class="text" id="createName" style="margin-bottom:6px;">
+
+    <div class="panel-section">
+      <div class="panel-section-title" id="lblCreatePanelDinersTitle"></div>
+      <div id="createDinerList"></div>
+      <div class="panel-add-row">
+        <input class="text" id="createDinerName">
+        <button class="btn ghost sm" id="createDinerAddBtn"></button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title" id="lblCreatePanelSeasonalTitle"></div>
+      <div id="createSeasList"></div>
+      <div class="panel-add-row">
+        <input class="text" id="createSeasName" style="flex:2;">
+        <div class="pricewrap"><span>$</span><input class="price" id="createSeasPrice" type="number" step="0.5" placeholder="0"></div>
+        <button class="btn ghost sm" id="createSeasAddBtn"></button>
+      </div>
+    </div>
+
+    <button class="btn primary" id="createPanelSubmitBtn" style="width:100%; margin-top:10px;"></button>
+    <button class="btn ghost" id="createPanelCancelBtn" style="width:100%; margin-top:8px;"></button>
+  </div>
+</div>
+
+<div id="joinPanelOverlay" class="lobby-overlay hidden">
+  <div class="lobby-card form-card">
+    <h1 id="lblJoinPanelTitle" style="margin:0 0 14px; font-size:18px; text-align:center;"></h1>
+
+    <div class="panel-section" id="joinPanelPickSection" style="margin-top:0;">
+      <div class="panel-section-title" id="lblJoinPanelPickTitle"></div>
+      <div id="joinPanelPickList"></div>
+      <div class="lobby-divider" id="lblJoinPanelOr"></div>
+    </div>
+
+    <input class="text" id="joinName" style="margin-bottom:10px;">
+
+    <button class="btn primary" id="joinPanelSubmitBtn" style="width:100%; margin-top:4px;"></button>
+    <button class="btn ghost" id="joinPanelCancelBtn" style="width:100%; margin-top:8px;"></button>
   </div>
 </div>
 
@@ -553,6 +607,7 @@
     <div class="card">
       <h2><span class="ico">📜</span> <span id="lblHistoryTitle">過往帳單</span></h2>
       <p class="muted" style="margin-top:-4px" id="lblHistoryMuted">關閉帳單時，可選擇將結算結果儲存喺呢部手機。呢度嘅紀錄只喺你嘅手機，唔會上載到伺服器。</p>
+      <button class="btn ghost sm" id="saveToHistoryBtn" style="margin-bottom:10px;"></button>
       <div id="historyList"></div>
     </div>
   </section>
@@ -660,7 +715,16 @@ const i18n = {
     nativeShareBtn:'Share...', closeBtn:'Close',
     shareInviteText:'Join my Kaiten Sushi bill: {code}',
     pinSelfTitle:'Pin my tile to the top',
-    closeRoomBtnLabel:'Close Room'
+    closeRoomBtnLabel:'Close Room',
+    saveToHistoryBtn:'💾 Save current bill to history', savedToHistoryMsg:'Saved to history',
+    createPanelTitle:'Start a new bill', createNamePlaceholder:"What's your name?",
+    createPanelDinersTitle:'Other diners (optional)', createDinerPlaceholder:'Diner name',
+    createPanelAddBtn:'Add',
+    createPanelSeasonalTitle:'Seasonal dishes (optional)',
+    createPanelSubmitBtn:'Create Room', createPanelCancelBtn:'Cancel',
+    joinPanelTitle:'Join this room', joinPanelPickTitle:'Are you one of these?',
+    joinPanelOr:'or enter your name', joinNamePlaceholder:"What's your name?",
+    joinPanelSubmitBtn:'Join', joinPanelCancelBtn:'Cancel'
   },
   zh: {
     title:'壽司分帳機', headerTitle:'🍣 數碟郎 — 迴轉壽司分帳機',
@@ -727,7 +791,16 @@ const i18n = {
     nativeShareBtn:'分享...', closeBtn:'關閉',
     shareInviteText:'嚟同我一齊計數碟郎帳單：{code}',
     pinSelfTitle:'將我嘅卡置頂',
-    closeRoomBtnLabel:'結束帳單'
+    closeRoomBtnLabel:'結束帳單',
+    saveToHistoryBtn:'💾 將目前帳單儲存到歷史記錄', savedToHistoryMsg:'已儲存到歷史記錄',
+    createPanelTitle:'開新帳單', createNamePlaceholder:'你叫咩名？',
+    createPanelDinersTitle:'其他用餐者（可選）', createDinerPlaceholder:'用餐者名稱',
+    createPanelAddBtn:'新增',
+    createPanelSeasonalTitle:'季節限定（可選）',
+    createPanelSubmitBtn:'建立房間', createPanelCancelBtn:'取消',
+    joinPanelTitle:'加入呢個房間', joinPanelPickTitle:'你係唔係呢度其中一位？',
+    joinPanelOr:'或者輸入你嘅名', joinNamePlaceholder:'你叫咩名？',
+    joinPanelSubmitBtn:'加入', joinPanelCancelBtn:'取消'
   }
 };
 
@@ -910,6 +983,23 @@ function updateStaticLabels() {
   document.getElementById('lobbyCodeInput').placeholder     = t.lobbyCodePlaceholder;
   document.getElementById('lobbyJoinBtn').textContent       = t.lobbyJoinBtn;
   document.getElementById('lobbyOfflineBtn').textContent    = t.lobbyOfflineBtn;
+  document.getElementById('saveToHistoryBtn').textContent   = t.saveToHistoryBtn;
+  document.getElementById('lblCreatePanelTitle').textContent       = t.createPanelTitle;
+  document.getElementById('createName').placeholder               = t.createNamePlaceholder;
+  document.getElementById('lblCreatePanelDinersTitle').textContent = t.createPanelDinersTitle;
+  document.getElementById('createDinerName').placeholder          = t.createDinerPlaceholder;
+  document.getElementById('createDinerAddBtn').textContent        = t.createPanelAddBtn;
+  document.getElementById('lblCreatePanelSeasonalTitle').textContent = t.createPanelSeasonalTitle;
+  document.getElementById('createSeasName').placeholder           = t.seasNamePlaceholder;
+  document.getElementById('createSeasAddBtn').textContent         = t.createPanelAddBtn;
+  document.getElementById('createPanelSubmitBtn').textContent     = t.createPanelSubmitBtn;
+  document.getElementById('createPanelCancelBtn').textContent     = t.createPanelCancelBtn;
+  document.getElementById('lblJoinPanelTitle').textContent        = t.joinPanelTitle;
+  document.getElementById('lblJoinPanelPickTitle').textContent    = t.joinPanelPickTitle;
+  document.getElementById('lblJoinPanelOr').textContent           = t.joinPanelOr;
+  document.getElementById('joinName').placeholder                 = t.joinNamePlaceholder;
+  document.getElementById('joinPanelSubmitBtn').textContent       = t.joinPanelSubmitBtn;
+  document.getElementById('joinPanelCancelBtn').textContent       = t.joinPanelCancelBtn;
 }
 function getDishName(d) {
   if (d.seasonal) return d.name;
@@ -1660,10 +1750,74 @@ function hideLobby() {
   document.getElementById('lobbyOverlay').classList.add('hidden');
 }
 
-async function startNewBill() {
+/* ── create-room panel: collects the host's name plus, optionally, other
+   diners and seasonal dishes up front, all before the room even exists --
+   everything is held in these two arrays until submit. ── */
+let createPanelDiners = [];
+let createPanelSeasonal = [];
+
+function openCreatePanel() {
+  createPanelDiners = [];
+  createPanelSeasonal = [];
+  document.getElementById('createName').value = '';
+  document.getElementById('createDinerName').value = '';
+  document.getElementById('createSeasName').value = '';
+  document.getElementById('createSeasPrice').value = '';
+  renderCreatePanelDiners();
+  renderCreatePanelSeasonal();
+  document.getElementById('createPanelOverlay').classList.remove('hidden');
+  document.getElementById('createName').focus();
+}
+function closeCreatePanel() {
+  document.getElementById('createPanelOverlay').classList.add('hidden');
+}
+function addCreatePanelDiner() {
+  const inp = document.getElementById('createDinerName');
+  const name = inp.value.trim();
+  if (!name) return;
+  createPanelDiners.push(name);
+  inp.value = '';
+  renderCreatePanelDiners();
+  inp.focus();
+}
+function renderCreatePanelDiners() {
+  const list = document.getElementById('createDinerList');
+  list.innerHTML = createPanelDiners.map((name, idx) => `
+    <div class="chip-row"><span>${escapeHtml(name)}</span>
+      <button type="button" data-idx="${idx}" class="chip-remove">&times;</button>
+    </div>`).join('');
+  list.querySelectorAll('.chip-remove').forEach(btn => {
+    btn.onclick = () => { createPanelDiners.splice(Number(btn.dataset.idx), 1); renderCreatePanelDiners(); };
+  });
+}
+function addCreatePanelSeasonal() {
   const t = i18n[currentLang];
-  const name = prompt(t.lobbyEnterName) || '';
-  const btn = document.getElementById('lobbyStartBtn');
+  const nameInp = document.getElementById('createSeasName');
+  const priceInp = document.getElementById('createSeasPrice');
+  const name = nameInp.value.trim();
+  const price = parseFloat(priceInp.value);
+  if (!name) { toast(t.msgEnterName); return; }
+  if (isNaN(price) || price < 0) { toast(t.msgEnterPrice); return; }
+  createPanelSeasonal.push({ name, price });
+  nameInp.value = ''; priceInp.value = '';
+  renderCreatePanelSeasonal();
+  nameInp.focus();
+}
+function renderCreatePanelSeasonal() {
+  const list = document.getElementById('createSeasList');
+  list.innerHTML = createPanelSeasonal.map((d, idx) => `
+    <div class="chip-row"><span>${escapeHtml(d.name)} — ${money(d.price)}</span>
+      <button type="button" data-idx="${idx}" class="chip-remove">&times;</button>
+    </div>`).join('');
+  list.querySelectorAll('.chip-remove').forEach(btn => {
+    btn.onclick = () => { createPanelSeasonal.splice(Number(btn.dataset.idx), 1); renderCreatePanelSeasonal(); };
+  });
+}
+
+async function submitCreatePanel() {
+  const t = i18n[currentLang];
+  const name = document.getElementById('createName').value.trim();
+  const btn = document.getElementById('createPanelSubmitBtn');
   btn.disabled = true;
   const { data, error } = await supabaseClient.rpc('create_bill', { p_host_name: name });
   if (error || !data) {
@@ -1673,31 +1827,48 @@ async function startNewBill() {
     return;
   }
 
-  // a fresh room has no menu yet -- seed it with the same default plates the offline app uses.
-  // Sequential, not Promise.all: the display order is already guaranteed by sortMenuArrays()
-  // regardless, but seeding in order means the underlying created_at timestamps also reflect
-  // the intended order, rather than whatever order 6 parallel requests happened to land in.
-  const seedResults = [];
+  // a fresh room has no menu yet -- seed it with the same default plates the offline app uses,
+  // then anything typed into the panel. Sequential, not Promise.all: the display order is
+  // already guaranteed by sortMenuArrays() regardless, but seeding in order means the underlying
+  // created_at timestamps also reflect the intended order, rather than whatever order parallel
+  // requests happened to land in.
   for (const d of DEFAULT_STANDARD) {
     const r = await supabaseClient.rpc('add_menu_item', { p_bill: data.bill.id, p_dish_key: d.id, p_name: d.name, p_price: d.price, p_kind: 'standard' });
-    seedResults.push({ dishKey: d.id, ...r });
+    if (r.error) console.error('seed dish failed:', d.id, r.error);
   }
+  for (const dinerName of createPanelDiners) {
+    const r = await supabaseClient.rpc('add_diner', { p_bill: data.bill.id, p_name: dinerName });
+    if (r.error) console.error('add_diner (panel) failed:', dinerName, r.error);
+  }
+  for (const dish of createPanelSeasonal) {
+    const dishKey = 'seas_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+    const r = await supabaseClient.rpc('add_menu_item', { p_bill: data.bill.id, p_dish_key: dishKey, p_name: dish.name, p_price: dish.price, p_kind: 'seasonal' });
+    if (r.error) console.error('add seasonal (panel) failed:', dish.name, r.error);
+  }
+
+  // re-fetch the full room state now that everything's seeded, so the fold includes it all
+  const fresh = await supabaseClient.rpc('join_room', { p_room: data.bill.room_code });
   btn.disabled = false;
+  if (fresh.error || !fresh.data) {
+    console.error('re-fetch after create failed:', fresh.error);
+    toast(t.lobbyNetworkError);
+    return;
+  }
 
-  const failed = seedResults.filter(r => r.error);
-  if (failed.length) console.error('some default dishes failed to seed:', failed);
-  const menuItems = seedResults.filter(r => !r.error).map(r => ({
-    id: r.data, dish_key: r.dishKey, name: DEFAULT_BY_ID[r.dishKey].name,
-    price: DEFAULT_BY_ID[r.dishKey].price, kind: 'standard', is_active: true
-  }));
-
-  saveRoom({ bill_id: data.bill.id, room_code: data.bill.room_code, diner_id: data.host_diner_id, device_id: getDeviceId() });
-  enterRoom({ bill: data.bill, diners: data.diners, menu_items: menuItems, events: [] });
-  showRoomBadge(data.bill.room_code);
+  saveRoom({ bill_id: fresh.data.bill.id, room_code: fresh.data.bill.room_code, diner_id: data.host_diner_id, device_id: getDeviceId() });
+  enterRoom(fresh.data);
+  showRoomBadge(fresh.data.bill.room_code);
+  closeCreatePanel();
   hideLobby();
-  toast(t.lobbyRoomCreated.replace('{code}', data.bill.room_code));
+  toast(t.lobbyRoomCreated.replace('{code}', fresh.data.bill.room_code));
   claimDiner(data.host_diner_id); // you obviously are the diner you just created
 }
+
+/* ── join-room panel: validates the code first, then shows a name field plus,
+   if any diner tiles are still unclaimed, a list to pick yourself from instead
+   of typing a new name. ── */
+let joinPanelRoomData = null;
+let joinPanelCode = null;
 
 async function joinRoomByCode() {
   const t = i18n[currentLang];
@@ -1707,35 +1878,81 @@ async function joinRoomByCode() {
   const btn = document.getElementById('lobbyJoinBtn');
   btn.disabled = true;
   const { data, error } = await supabaseClient.rpc('join_room', { p_room: code });
+  btn.disabled = false;
   if (error || !data || !data.bill) {
-    btn.disabled = false;
     toast(t.lobbyInvalidCode);
     return;
   }
-  const name = prompt(t.lobbyEnterName) || '';
-  const { data: newDinerId, error: dinerErr } = await supabaseClient.rpc('add_diner', { p_bill: data.bill.id, p_name: name });
-  if (dinerErr) {
-    btn.disabled = false;
-    console.error('add_diner failed:', dinerErr);
-    toast(t.lobbyNetworkError);
-    return;
+  openJoinPanel(code, data);
+}
+
+function openJoinPanel(code, data) {
+  const t = i18n[currentLang];
+  joinPanelCode = code;
+  joinPanelRoomData = data;
+  const unclaimed = (data.diners || []).filter(d => !d.claimed_by_device);
+  const pickSection = document.getElementById('joinPanelPickSection');
+  const list = document.getElementById('joinPanelPickList');
+  if (unclaimed.length) {
+    list.innerHTML = unclaimed.map(d => `
+      <button type="button" class="btn ghost sm panel-pick-btn" data-id="${d.id}">${escapeHtml(d.name || t.personDefault)}</button>
+    `).join('');
+    list.querySelectorAll('.panel-pick-btn').forEach(b => {
+      b.onclick = () => submitJoinPanel({ existingDinerId: b.dataset.id });
+    });
+    pickSection.style.display = '';
+  } else {
+    pickSection.style.display = 'none';
+  }
+  document.getElementById('joinName').value = '';
+  document.getElementById('joinPanelOverlay').classList.remove('hidden');
+  document.getElementById('joinName').focus();
+}
+function closeJoinPanel() {
+  document.getElementById('joinPanelOverlay').classList.add('hidden');
+  joinPanelRoomData = null;
+  joinPanelCode = null;
+}
+
+async function submitJoinPanel(opts) {
+  const t = i18n[currentLang];
+  if (!joinPanelRoomData) return;
+  const existingDinerId = opts && opts.existingDinerId;
+  const submitBtn = document.getElementById('joinPanelSubmitBtn');
+  submitBtn.disabled = true;
+
+  let dinerId = existingDinerId;
+  let snap = joinPanelRoomData;
+
+  if (!dinerId) {
+    const name = document.getElementById('joinName').value.trim();
+    const { data: newDinerId, error: dinerErr } = await supabaseClient.rpc('add_diner', { p_bill: joinPanelRoomData.bill.id, p_name: name });
+    if (dinerErr) {
+      submitBtn.disabled = false;
+      console.error('add_diner failed:', dinerErr);
+      toast(t.lobbyNetworkError);
+      return;
+    }
+    dinerId = newDinerId;
+    // re-fetch the full room state now that we've been added, so the fold includes us
+    const fresh = await supabaseClient.rpc('join_room', { p_room: joinPanelCode });
+    if (fresh.error || !fresh.data) {
+      submitBtn.disabled = false;
+      console.error('re-fetch after join failed:', fresh.error);
+      toast(t.lobbyNetworkError);
+      return;
+    }
+    snap = fresh.data;
   }
 
-  // re-fetch the full room state now that we've been added, so the fold includes us
-  const fresh = await supabaseClient.rpc('join_room', { p_room: code });
-  btn.disabled = false;
-  if (fresh.error || !fresh.data) {
-    console.error('re-fetch after join failed:', fresh.error);
-    toast(t.lobbyNetworkError);
-    return;
-  }
-
-  saveRoom({ bill_id: fresh.data.bill.id, room_code: fresh.data.bill.room_code, diner_id: newDinerId, device_id: getDeviceId() });
-  enterRoom(fresh.data);
-  showRoomBadge(fresh.data.bill.room_code);
+  submitBtn.disabled = false;
+  saveRoom({ bill_id: snap.bill.id, room_code: snap.bill.room_code, diner_id: dinerId, device_id: getDeviceId() });
+  enterRoom(snap);
+  showRoomBadge(snap.bill.room_code);
+  closeJoinPanel();
   hideLobby();
-  toast(t.lobbyJoinedRoom.replace('{code}', fresh.data.bill.room_code));
-  claimDiner(newDinerId); // you obviously are the diner you just created
+  toast(t.lobbyJoinedRoom.replace('{code}', snap.bill.room_code));
+  claimDiner(dinerId); // you obviously are the diner you just claimed/created
 }
 
 function useOffline() {
@@ -2041,6 +2258,18 @@ function handleBillClosed() {
   window.location.reload(); // simplest reliable path back to a clean lobby
 }
 
+// Manual checkpoint save -- works online or offline, and unlike
+// finishAndClose() doesn't close the room or clear the tally. This is the
+// only save path offline mode has, since handleBillClosed() (the other save
+// path) only ever fires from a room actually being closed online.
+function saveCurrentBillToHistory() {
+  const room = getRoom();
+  const bd = computeBillBreakdown();
+  saveBillToHistory(bd, room ? room.room_code : null);
+  renderHistory();
+  toast(i18n[currentLang].savedToHistoryMsg);
+}
+
 function saveBillToHistory(bd, roomCode) {
   let history = [];
   try { history = JSON.parse(localStorage.getItem('sushi_bill_history')) || []; } catch(e) {}
@@ -2103,9 +2332,15 @@ function renderHistory() {
     const card = document.createElement('div'); card.className = 'card';
     const date = new Date(entry.closedAt).toLocaleString(currentLang === 'zh' ? 'zh-HK' : 'en-US');
     const roomLabel = entry.roomCode ? ` · ${entry.roomCode}` : '';
+    const peopleRows = entry.people.map((p, pIdx) => `
+      <div style="display:flex; justify-content:space-between; gap:8px; padding:4px 0; border-top:1px dashed var(--line); font-size:13px;">
+        <span>${escapeHtml(p.name || (t.personDefault + (pIdx + 1)))} <span class="muted">· ${p.plates}${t.plates}</span></span>
+        <b>${money(p.total)}</b>
+      </div>`).join('');
     card.innerHTML = `
       <div style="font-weight:700">${escapeHtml(date)}${escapeHtml(roomLabel)}</div>
       <div class="muted" style="font-size:13px; margin-top:2px;">${entry.people.length}${t.unitPeople} · ${entry.grandPlates}${t.plates} · <b style="color:var(--accent)">${money(entry.grandFinal)}</b></div>
+      <div style="margin-top:4px;">${peopleRows}</div>
       <div class="footer-actions">
         <button class="btn ghost sm" data-action="copy">${t.copyBill}</button>
         <button class="btn ghost sm" data-action="export">${t.exportJsonBtn}</button>
@@ -2239,13 +2474,27 @@ document.getElementById('addSeas').onclick     = addSeasonal;
 document.getElementById('seasName').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('seasPrice').focus(); });
 document.getElementById('seasPrice').addEventListener('keydown', e => { if (e.key==='Enter') addSeasonal(); });
 document.getElementById('copyBill').onclick    = copyBillSummary;
+document.getElementById('saveToHistoryBtn').onclick = saveCurrentBillToHistory;
 document.getElementById('resetPrices').onclick = resetPrices;
 document.getElementById('langToggleBtn').onclick = () => setLanguage(currentLang === 'en' ? 'zh' : 'en');
 
-document.getElementById('lobbyStartBtn').onclick   = startNewBill;
+document.getElementById('lobbyStartBtn').onclick   = openCreatePanel;
 document.getElementById('lobbyJoinBtn').onclick    = joinRoomByCode;
 document.getElementById('lobbyOfflineBtn').onclick = useOffline;
 document.getElementById('lobbyCodeInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoomByCode(); });
+
+document.getElementById('createPanelSubmitBtn').onclick = submitCreatePanel;
+document.getElementById('createPanelCancelBtn').onclick = closeCreatePanel;
+document.getElementById('createName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('createDinerName').focus(); } });
+document.getElementById('createDinerAddBtn').onclick = addCreatePanelDiner;
+document.getElementById('createDinerName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addCreatePanelDiner(); } });
+document.getElementById('createSeasAddBtn').onclick = addCreatePanelSeasonal;
+document.getElementById('createSeasName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('createSeasPrice').focus(); } });
+document.getElementById('createSeasPrice').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addCreatePanelSeasonal(); } });
+
+document.getElementById('joinPanelSubmitBtn').onclick = () => submitJoinPanel();
+document.getElementById('joinPanelCancelBtn').onclick = closeJoinPanel;
+document.getElementById('joinName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); submitJoinPanel(); } });
 document.getElementById('goOfflineLink').onclick     = goOfflineFork;
 document.getElementById('bannerGoOfflineBtn').onclick = goOfflineFork;
 
