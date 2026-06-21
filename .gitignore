@@ -1,1 +1,6 @@
 .claude/
+
+# Kept locally for reference only -- deliberately not pushed to the public repo
+# (database internals + the technical handoff doc, per explicit request)
+supabase/
+CLAUDE_HANDOFF.md
