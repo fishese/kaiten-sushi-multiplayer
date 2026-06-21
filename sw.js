@@ -1,8 +1,10 @@
-const CACHE = 'sushi-split-v6';
+const CACHE = 'sushi-split-v7';
 const ASSETS = [
   './index.html',
   './manifest.json',
-  './sushiicon.svg'
+  './sushiicon.svg',
+  './pin-fish-empty.svg',
+  './pin-fish-full.svg'
 ];
 // Without these being cached *somehow*, opening the installed app with zero
 // connectivity would crash before rendering anything: the page's own script
