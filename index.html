@@ -447,7 +447,7 @@
       <div id="createSeasList"></div>
       <div class="panel-add-row">
         <input class="text" id="createSeasName" style="flex:2;">
-        <div class="pricewrap"><span>$</span><input class="price" id="createSeasPrice" type="number" step="0.5" placeholder="0"></div>
+        <div class="pricewrap"><span>$</span><input class="price" id="createSeasPrice" type="number" step="1" placeholder="0"></div>
         <button class="btn ghost sm" id="createSeasAddBtn"></button>
       </div>
     </div>
@@ -620,7 +620,7 @@
       <div id="seasonalList"></div>
       <div class="addrow">
         <input class="text" id="seasName" placeholder="品名（例如：特選海膽）" style="flex:1;min-width:160px">
-        <div class="pricewrap"><span>$</span><input class="price" id="seasPrice" type="number" step="0.5" placeholder="0"></div>
+        <div class="pricewrap"><span>$</span><input class="price" id="seasPrice" type="number" step="1" placeholder="0"></div>
         <button class="btn primary sm" id="addSeas">新增項目</button>
       </div>
     </div>
@@ -1564,7 +1564,7 @@ function renderSettings() {
       ${d.kind==='discount' ? `<div class="muted" style="font-size:12px; margin-top:2px;">${money(d.price)} ${i18n[currentLang].dealSuffix}</div>` : ''}`;
     const pw  = document.createElement('div'); pw.className = 'pricewrap';
     const sym = document.createElement('span'); sym.textContent = '$';
-    const inp = document.createElement('input'); inp.className = 'price'; inp.type = 'number'; inp.step = '0.5'; inp.value = d.price;
+    const inp = document.createElement('input'); inp.className = 'price'; inp.type = 'number'; inp.step = '1'; inp.value = d.price;
 
     inp.onfocus = () => inp.select();
     inp.onchange = () => {
@@ -1591,7 +1591,7 @@ function renderSettings() {
     };
     const pw  = document.createElement('div'); pw.className = 'pricewrap';
     const sym = document.createElement('span'); sym.textContent = '$';
-    const pr  = document.createElement('input'); pr.className = 'price'; pr.type = 'number'; pr.step = '0.5'; pr.value = d.price;
+    const pr  = document.createElement('input'); pr.className = 'price'; pr.type = 'number'; pr.step = '1'; pr.value = d.price;
 
     pr.onfocus = () => pr.select();
     pr.onchange = () => {
