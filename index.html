@@ -735,6 +735,27 @@ window.addEventListener('online',  () => { browserOnline = true;  updateConnecti
 window.addEventListener('offline', () => { browserOnline = false; updateConnectionUI(); });
 const DEFAULT_BY_ID = {};
 DEFAULT_STANDARD.forEach(d => DEFAULT_BY_ID[d.id] = d);
+const DEFAULT_ORDER = DEFAULT_STANDARD.map(d => d.id);
+
+// Keeps the dish grid in the same order on every device. Without this, the
+// order is whatever the server happened to return menu_items in -- which is
+// NOT guaranteed (join_room has no ORDER BY for that table), and the initial
+// seeding of the 6 default plates fires all 6 add_menu_item calls in
+// parallel, so even their insertion order isn't reliable. Sorting client-side
+// against a fixed reference list sidesteps all of that instead of relying on
+// server-side timing. Standard plates use the app's own canonical order;
+// seasonal dishes have no such canonical order, so alphabetical is just the
+// simplest rule every device can agree on independently.
+function sortMenuArrays() {
+  settings.standard.sort((a, b) => {
+    const ai = DEFAULT_ORDER.indexOf(a.id), bi = DEFAULT_ORDER.indexOf(b.id);
+    if (ai === -1 && bi === -1) return a.id.localeCompare(b.id);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+  settings.seasonal.sort((a, b) => a.name.localeCompare(b.name));
+}
 
 /* ── persistence ── */
 function loadSettings() {
@@ -1562,11 +1583,15 @@ async function startNewBill() {
     return;
   }
 
-  // a fresh room has no menu yet -- seed it with the same default plates the offline app uses
-  const seedResults = await Promise.all(DEFAULT_STANDARD.map(d =>
-    supabaseClient.rpc('add_menu_item', { p_bill: data.bill.id, p_dish_key: d.id, p_name: d.name, p_price: d.price, p_kind: 'standard' })
-      .then(r => ({ dishKey: d.id, ...r }))
-  ));
+  // a fresh room has no menu yet -- seed it with the same default plates the offline app uses.
+  // Sequential, not Promise.all: the display order is already guaranteed by sortMenuArrays()
+  // regardless, but seeding in order means the underlying created_at timestamps also reflect
+  // the intended order, rather than whatever order 6 parallel requests happened to land in.
+  const seedResults = [];
+  for (const d of DEFAULT_STANDARD) {
+    const r = await supabaseClient.rpc('add_menu_item', { p_bill: data.bill.id, p_dish_key: d.id, p_name: d.name, p_price: d.price, p_kind: 'standard' });
+    seedResults.push({ dishKey: d.id, ...r });
+  }
   btn.disabled = false;
 
   const failed = seedResults.filter(r => r.error);
@@ -1661,6 +1686,7 @@ function applySnapshot(snap) {
       settings.standard.push(dish);
     }
   });
+  sortMenuArrays();
 
   settings.serviceCharge = !!snap.bill.service_charge;
   settings.rounding      = !!snap.bill.rounding;
@@ -1878,6 +1904,7 @@ function applyRemoteMenuItemUpsert(item) {
     if (def) { dish.kind = def.kind; dish.color = def.color; dish.sushi = def.sushi; }
     settings.standard.push(dish);
   }
+  sortMenuArrays();
   renderSettings();
   renderTally();
 }
@@ -2036,6 +2063,7 @@ async function addSeasonal() {
   }
 
   settings.seasonal.push({ id: dishKey, name, price, seasonal: true });
+  if (isOnline) sortMenuArrays();
   document.getElementById('seasName').value  = '';
   document.getElementById('seasPrice').value = '';
   saveSettings(); renderSettings(); renderTally();
